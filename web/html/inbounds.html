@@ -718,6 +718,8 @@
       <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
         <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.presetLabel" }}`">
           <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
+            <a-select-option value="auto">{{ i18n "pages.inbounds.oneClick.presetAuto" }}</a-select-option>
+            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
             <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
             <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
             <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
@@ -763,6 +765,9 @@
           </a-input>
           <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'tls' || oneClickForm.preset === 'trojan'">
             {{ i18n "pages.inbounds.oneClick.certHint" }}
+          </div>
+          <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'auto'">
+            {{ i18n "pages.inbounds.oneClick.autoHint" }}
           </div>
         </a-form-item>
 
@@ -968,7 +973,7 @@
             oneClickDomainLoading: false,
             oneClickResult: null,
             oneClickForm: {
-                preset: 'reality',
+                preset: 'auto',
                 count: 10,
                 startPort: 0,
                 remarkPrefix: 'reality',
@@ -1245,9 +1250,9 @@ async openPort(port) {
                 this.oneClickLoading = true;
                 this.oneClickResult = null;
                 try {
-                    const isTlsPreset = (form.preset === 'tls' || form.preset === 'trojan');
+                    const isTlsPreset = (form.preset === 'tls' || form.preset === 'trojan' || form.preset === 'auto');
                     const msg = await HttpUtil.post('/panel/api/inbounds/batchDeployReality', {
-                        preset: form.preset || 'reality',
+                        preset: form.preset || 'auto',
                         count: form.count,
                         startPort: form.startPort || 0,
                         remarkPrefix: form.remarkPrefix || 'reality',
@@ -1277,7 +1282,7 @@ async openPort(port) {
 
             resetOneClickForm() {
                 this.oneClickForm = {
-                    preset: 'reality',
+                    preset: 'auto',
                     count: 10,
                     startPort: 0,
                     remarkPrefix: 'reality',

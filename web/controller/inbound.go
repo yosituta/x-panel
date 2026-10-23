@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 
 	"x-ui/database/model"
@@ -129,6 +130,14 @@ func (a *InboundController) batchDeployReality(c *gin.Context) {
 	}
 	if user := session.GetLoginUser(c); user != nil {
 		opts.UserId = user.Id
+	}
+	// 【开源增强】auto 预设需要知道当前访问域名，用于判断能否走 TLS
+	if opts.Host == "" {
+		host := c.Request.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		opts.Host = host
 	}
 	var deployService service.BatchDeployService
 	result, needRestart, err := deployService.Deploy(opts)

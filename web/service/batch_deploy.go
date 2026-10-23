@@ -33,6 +33,7 @@ import (
 // 这时换 TLS 预设即可，不需要换服务器。
 
 const (
+	PresetAuto            = "auto" // 自动：有证书且访问域名为域名时用 TLS，否则用 Reality
 	PresetReality         = "reality"
 	PresetRealityNoVision = "reality-novision"
 	PresetRealityUDP443   = "reality-udp443"
@@ -430,7 +431,35 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		o.Fingerprint = DefaultFingerprint
 	}
 	if o.Preset == "" {
+		o.Preset = PresetAuto
+	}
+
+	// 自动预设：面板配了证书且访问地址是域名（不是 IP）时选 TLS，否则退回 Reality。
+	// 原因：部分客户端（如部分版本的 Shadowrocket）Reality 握手会被服务端判定为
+	// “authentication failed”，而 TLS 预设用的是面板自己的真证书，兼容性最好。
+	if o.Preset == PresetAuto {
 		o.Preset = PresetReality
+		var ss SettingService
+		certFile, err1 := ss.GetCertFile()
+		keyFile, err2 := ss.GetKeyFile()
+		candidate := o.Domain
+		if candidate == "" {
+			candidate = o.Host
+		}
+		if err1 == nil && err2 == nil && certFile != "" && keyFile != "" &&
+			candidate != "" && net.ParseIP(candidate) == nil {
+			o.Preset = PresetTLS
+		}
+	}
+
+	// 备注前缀跟随实际预设，避免全部叫 reality-xx
+	if o.RemarkPrefix == DefaultBatchPrefix {
+		switch o.Preset {
+		case PresetTLS:
+			o.RemarkPrefix = "tls"
+		case PresetTrojan:
+			o.RemarkPrefix = "trojan"
+		}
 	}
 
 	result := &BatchDeployResult{
