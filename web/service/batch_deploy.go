@@ -36,6 +36,7 @@ const (
 	PresetReality         = "reality"
 	PresetRealityNoVision = "reality-novision"
 	PresetRealityUDP443   = "reality-udp443"
+	PresetRealityLegacy   = "reality-legacy" // 完全复刻上游旧版“一键配置”的写法
 	PresetTLS             = "tls"
 	PresetTrojan          = "trojan"
 
@@ -83,6 +84,16 @@ type BatchDeployResult struct {
 	Created   []DeployedInbound `json:"created"`
 	Failed    []string          `json:"failed"`
 	Restarted bool              `json:"restarted"`
+}
+
+// legacyRealityDests 上游旧版一键配置使用的目标域名（原文就是裸域名，dest 形如 tesla.com:443）
+var legacyRealityDests = []string{
+	"tesla.com",
+	"sega.com",
+	"apple.com",
+	"icloud.com",
+	"lovelive-anime.jp",
+	"meta.com",
 }
 
 type BatchDeployService struct{}
@@ -236,6 +247,56 @@ func buildInbound(o *BatchDeployOptions, port int, domain, remark string, creds 
 		deployed.ShortId = shortId
 		deployed.ServerName = domain
 
+	case PresetRealityLegacy:
+		clientUUID := uuid.NewString()
+		privateKey, publicKey, err := genX25519()
+		if err != nil {
+			return nil, nil, err
+		}
+		shortId, err := genShortId()
+		if err != nil {
+			return nil, nil, err
+		}
+		bare := domain
+		inbound.Protocol = model.VLESS
+		// 与上游旧版 createVlessRealityInbound 的 JSON 结构保持一致
+		inbound.Settings = mustJSON(map[string]any{
+			"clients": []map[string]any{{
+				"id": clientUUID, "flow": "xtls-rprx-vision", "email": email,
+				"level": 0, "enable": true,
+			}},
+			"decryption": "none",
+			"fallbacks":  []any{},
+		})
+		inbound.StreamSettings = mustJSON(map[string]any{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]any{
+				"show":         false,
+				"target":       net.JoinHostPort(bare, "443"),
+				"xver":         0,
+				"serverNames":  []string{bare, "www." + bare},
+				"settings":     map[string]any{"publicKey": publicKey, "spiderX": "/", "mldsa65Verify": ""},
+				"privateKey":   privateKey,
+				"maxClientVer": "", "minClientVer": "", "maxTimediff": 0, "mldsa65Seed": "",
+				"shortIds": []string{shortId},
+			},
+			"tcpSettings": map[string]any{
+				"acceptProxyProtocol": false,
+				"header":              map[string]any{"type": "none"},
+			},
+		})
+		inbound.Sniffing = mustJSON(map[string]any{
+			"enabled":      true,
+			"destOverride": []string{"http", "tls", "quic", "fakedns"},
+			"metadataOnly": false,
+			"routeOnly":    false,
+		})
+		deployed.UUID = clientUUID
+		deployed.PublicKey = publicKey
+		deployed.ShortId = shortId
+		deployed.ServerName = bare
+
 	case PresetTLS:
 		if creds == nil || creds.CertFile == "" || creds.KeyFile == "" {
 			return nil, nil, fmt.Errorf("TLS 预设需要在面板【设置】里配置证书（webCertFile / webKeyFile）")
@@ -320,6 +381,11 @@ func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 		fp = DefaultFingerprint
 	}
 	switch d.Preset {
+	case PresetRealityLegacy:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=tcp&encryption=none&security=reality&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%%2F&flow=xtls-rprx-vision#%s",
+			d.UUID, host, d.Port, d.PublicKey, fp, d.ServerName, d.ShortId, d.Remark,
+		)
 	case PresetReality, PresetRealityNoVision, PresetRealityUDP443:
 		flow := ""
 		switch d.Preset {
@@ -393,7 +459,12 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 
 	// Reality 预设需要偷用域名（未指定则探测一个可用的）
 	domain := o.Domain
-	if o.Preset == PresetReality || o.Preset == PresetRealityNoVision || o.Preset == PresetRealityUDP443 {
+	if o.Preset == PresetRealityLegacy {
+		// 上游旧版：从固定域名池随机挑一个裸域名
+		if domain == "" {
+			domain = legacyRealityDests[time.Now().UnixNano()%int64(len(legacyRealityDests))]
+		}
+	} else if o.Preset == PresetReality || o.Preset == PresetRealityNoVision || o.Preset == PresetRealityUDP443 {
 		if domain == "" {
 			var domainService RealityDomainService
 			domain = domainService.RandomAliveDomain(3 * time.Second).Domain
