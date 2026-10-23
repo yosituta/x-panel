@@ -57,6 +57,11 @@ func (s *XrayService) GetXrayErr() error {
 	}
 
 	err := p.GetErr()
+	if err == nil {
+		// 【开源增强】xray 未启动/未安装时 GetErr 可能返回 nil，
+		// 原实现直接 err.Error() 会 panic，导致状态刷新协程把整个进程带崩
+		return nil
+	}
 
 	if runtime.GOOS == "windows" && err.Error() == "exit status 1" {
 		// exit status 1 on Windows means that Xray process was killed

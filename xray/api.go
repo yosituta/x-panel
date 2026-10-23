@@ -64,11 +64,25 @@ func (x *XrayAPI) Close() {
 	x.isConnected = false
 }
 
+// handlerClient 返回可用的 gRPC 客户端。
+// 【开源增强】原实现直接 `client := *x.HandlerServiceClient`，
+// 在 Xray 未运行 / API 未初始化时会解引用 nil 指针直接 panic，
+// 导致整个 HTTP 请求 500 且数据未落库。这里改为返回错误。
+func (x *XrayAPI) handlerClient() (command.HandlerServiceClient, error) {
+	if x.HandlerServiceClient == nil {
+		return nil, fmt.Errorf("xray api not initialized (is xray-core running?)")
+	}
+	return *x.HandlerServiceClient, nil
+}
+
 func (x *XrayAPI) AddInbound(inbound []byte) error {
-	client := *x.HandlerServiceClient
+	client, err := x.handlerClient()
+	if err != nil {
+		return err
+	}
 
 	conf := new(conf.InboundDetourConfig)
-	err := json.Unmarshal(inbound, conf)
+	err = json.Unmarshal(inbound, conf)
 	if err != nil {
 		logger.Debug("Failed to unmarshal inbound:", err)
 		return err
@@ -86,8 +100,11 @@ func (x *XrayAPI) AddInbound(inbound []byte) error {
 }
 
 func (x *XrayAPI) DelInbound(tag string) error {
-	client := *x.HandlerServiceClient
-	_, err := client.RemoveInbound(context.Background(), &command.RemoveInboundRequest{
+	client, err := x.handlerClient()
+	if err != nil {
+		return err
+	}
+	_, err = client.RemoveInbound(context.Background(), &command.RemoveInboundRequest{
 		Tag: tag,
 	})
 	return err
@@ -169,9 +186,12 @@ func (x *XrayAPI) AddUser(Protocol string, inboundTag string, user map[string]an
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	client := *x.HandlerServiceClient
+	client, err := x.handlerClient()
+	if err != nil {
+		return err
+	}
 
-	_, err := client.AlterInbound(ctx, &command.AlterInboundRequest{ // 〔中文注释〕: (修改点) 使用上面创建的带超时的 ctx
+	_, err = client.AlterInbound(ctx, &command.AlterInboundRequest{ // 〔中文注释〕: (修改点) 使用上面创建的带超时的 ctx
 		Tag: inboundTag,
 		Operation: serial.ToTypedMessage(&command.AddUserOperation{
 			User: &protocol.User{

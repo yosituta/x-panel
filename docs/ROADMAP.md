@@ -15,6 +15,17 @@
 
 ### 第一批实测要点
 
+全部在真实进程上跑过（Windows + MinGW/CGO 构建，Xray 未安装的降级场景）：
+
+| 验证项 | 结果 |
+| --- | --- |
+| `scripts/e2e-smoke.sh` 全流程（登录 → 批量部署 → 落库校验 → 周期字段增改 → 清理） | 7/7 通过 |
+| 批量部署 2 条 Reality 节点 | 返回 2 条真实 x25519 公钥 + shortId + vless 链接，入库可查 |
+| 周期重置真实触发（up=123456 / down=654321） | 1 分钟内被清零，`lastResetTime` 写为当日 00:00 |
+| 同周期幂等 | 再等 70 秒，`lastResetTime` 不变、流量仍为 0 |
+| 编辑入站改重置方式 | `monthly/12` → `daily` 持久化成功 |
+
+
 - 周期重置：`go test ./web/service -run 'Scheduled|IsDue'` 6 个用例全绿
   （每日/每周/每月、闰年、跨周期幂等、禁用入站不重置）。
 - 批量部署：`buildVlessRealityInbound` 为纯函数，单测校验了 settings/streamSettings

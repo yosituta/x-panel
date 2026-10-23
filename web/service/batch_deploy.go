@@ -238,7 +238,10 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		o.Fingerprint = DefaultFingerprint
 	}
 
-	result := &BatchDeployResult{Created: make([]DeployedInbound, 0, o.Count)}
+	result := &BatchDeployResult{
+		Created: make([]DeployedInbound, 0, o.Count),
+		Failed:  make([]string, 0),
+	}
 
 	// 1. 选定偷用域名（未指定则探测一个可用的）
 	domain := o.Domain
