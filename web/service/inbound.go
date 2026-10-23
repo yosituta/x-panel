@@ -165,7 +165,61 @@ func (s *InboundService) checkEmailExistForInbound(inbound *model.Inbound) (stri
 }
 
 // AddInbound adds a new inbound to db
+// 【开源增强】为没有 subId 的客户端补一个随机订阅 ID，保证 /sub/<subId> 可用
+func ensureClientSubIDs(inbound *model.Inbound) {
+	if inbound == nil || inbound.Settings == "" {
+		return
+	}
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil || settings == nil {
+		return
+	}
+	raw, ok := settings["clients"].([]any)
+	if !ok || len(raw) == 0 {
+		return
+	}
+	changed := false
+	for _, item := range raw {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if s, _ := m["subId"].(string); strings.TrimSpace(s) == "" {
+			m["subId"] = NewSubID()
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	if bs, err := json.MarshalIndent(settings, "", "  "); err == nil {
+		inbound.Settings = string(bs)
+	}
+}
+
+// BackfillClientSubIDs 为历史入站补齐缺失的 subId（启动时调用一次）
+func (s *InboundService) BackfillClientSubIDs() error {
+	inbounds, err := s.GetAllInbounds()
+	if err != nil {
+		return err
+	}
+	db := database.GetDB()
+	for _, ib := range inbounds {
+		old := ib.Settings
+		ensureClientSubIDs(ib)
+		if ib.Settings != old {
+			if err := db.Model(&model.Inbound{}).Where("id = ?", ib.Id).
+				Update("settings", ib.Settings).Error; err != nil {
+				return err
+			}
+			logger.Info("已为入站", ib.Id, "的客户端补齐订阅 ID")
+		}
+	}
+	return nil
+}
+
 func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
+	ensureClientSubIDs(inbound)
 	// 中文注释：检查端口是否已存在
 	exist, err := s.checkPortExist(inbound.Listen, inbound.Port, 0)
 	if err != nil {
@@ -368,6 +422,7 @@ func (s *InboundService) GetInbound(id int) (*model.Inbound, error) {
 }
 
 func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
+	ensureClientSubIDs(inbound)
 	exist, err := s.checkPortExist(inbound.Listen, inbound.Port, inbound.Id)
 	if err != nil {
 		return inbound, false, err

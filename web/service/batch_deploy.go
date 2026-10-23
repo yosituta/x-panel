@@ -154,7 +154,7 @@ func newVlessClient(id, email, flow string, totalBytes, expiry int64, now int64)
 	return map[string]any{
 		"id": id, "flow": flow, "email": email, "limitIp": 0,
 		"totalGB": totalBytes, "expiryTime": expiry, "enable": true,
-		"tgId": 0, "subId": "", "comment": "", "reset": 0,
+		"tgId": 0, "subId": NewSubID(), "comment": "", "reset": 0,
 		"created_at": now, "updated_at": now,
 	}
 }
@@ -340,7 +340,7 @@ func buildInbound(o *BatchDeployOptions, port int, domain, remark string, creds 
 			"clients": []map[string]any{{
 				"password": password, "email": email, "limitIp": 0,
 				"totalGB": totalBytes, "expiryTime": o.ExpiryTime, "enable": true,
-				"tgId": 0, "subId": "", "comment": "", "reset": 0,
+				"tgId": 0, "subId": NewSubID(), "comment": "", "reset": 0,
 				"created_at": now, "updated_at": now,
 			}},
 			"fallbacks": []any{},

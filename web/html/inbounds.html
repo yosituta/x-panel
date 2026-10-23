@@ -274,7 +274,7 @@
                           <a-icon type="export"></a-icon>
                           {{ i18n "pages.inbounds.export" }}
                         </a-menu-item>
-                        <a-menu-item key="subs" v-if="subSettings.enable">
+                        <a-menu-item key="subs">
                           <a-icon type="export"></a-icon>
                           {{ i18n "pages.inbounds.export" }} - {{ i18n "pages.settings.subSettings" }}
                         </a-menu-item>
@@ -383,7 +383,7 @@
                               <a-icon type="export"></a-icon>
                               {{ i18n "pages.inbounds.export"}}
                             </a-menu-item>
-                            <a-menu-item key="subs" v-if="subSettings.enable">
+                            <a-menu-item key="subs">
                               <a-icon type="export"></a-icon>
                               {{ i18n "pages.inbounds.export"}} - {{ i18n "pages.settings.subSettings" }}
                             </a-menu-item>
@@ -2030,6 +2030,21 @@ async openPort(port) {
                 newDbInbound = this.checkFallback(dbInbound);
                 txtModal.show('{{ i18n "pages.inbounds.export"}}', newDbInbound.genInboundLinks(this.remarkModel), newDbInbound.remark);
             },
+            // 【开源增强】订阅链接：内置 /sub/:subid，支持 v2ray / Clash / sing-box / Surge
+            subBase() {
+                const path = window.location.pathname;
+                const prefix = path.substring(0, path.lastIndexOf('/panel') + 1);
+                return window.location.origin + prefix + 'sub/';
+            },
+            subURLBlock(subId) {
+                const base = this.subBase() + subId;
+                return [
+                    base,
+                    base + '?target=clash',
+                    base + '?target=singbox',
+                    base + '?target=surge',
+                ].join('\r\n\r\n');
+            },
             exportSubs(dbInboundId) {
                 const dbInbound = this.dbInbounds.find(row => row.id === dbInboundId);
                 const clients = this.getInboundClients(dbInbound);
@@ -2037,13 +2052,13 @@ async openPort(port) {
                 if (clients != null){
                     clients.forEach(c => {
                         if (c.subId && c.subId.length>0){
-                            subLinks.push(this.subSettings.subURI + c.subId)
+                            subLinks.push(this.subURLBlock(c.subId))
                         }
                     })
                 }
                 txtModal.show(
                     '{{ i18n "pages.inbounds.export"}} - {{ i18n "pages.settings.subSettings" }}',
-                    [...new Set(subLinks)].join('\n'),
+                    [...new Set(subLinks)].join('\r\n\r\n'),
                     dbInbound.remark + "-Subs");
             },
             importInbound() {
@@ -2064,14 +2079,14 @@ async openPort(port) {
                     if (clients != null){
                         clients.forEach(c => {
                             if (c.subId && c.subId.length>0){
-                                subLinks.push(this.subSettings.subURI + c.subId)
+                                subLinks.push(this.subURLBlock(c.subId))
                             }
                         })
                     }
                 }
                 txtModal.show(
                     '{{ i18n "pages.inbounds.export"}} - {{ i18n "pages.settings.subSettings" }}',
-                    [...new Set(subLinks)].join('\r\n'),
+                    [...new Set(subLinks)].join('\r\n\r\n'),
                     'All-Inbounds-Subs');
             },
             exportAllLinks() {

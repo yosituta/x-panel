@@ -285,11 +285,19 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.server = controller.NewServerController(g, s.serverService)
 	s.panel = controller.NewXUIController(g)
 	s.api = controller.NewAPIController(g)
+	// 【开源增强】订阅与格式转换（公开访问，靠 subId 鉴权）
+	controller.NewSubController(g)
 
 	return engine, nil
 }
 
 func (s *Server) startTask() {
+	// 【开源增强】启动时补齐客户端的订阅 ID
+	var inboundService service.InboundService
+	if err := inboundService.BackfillClientSubIDs(); err != nil {
+		logger.Warning("backfill client subId failed:", err)
+	}
+
 	err := s.xrayService.RestartXray(true)
 	if err != nil {
 		logger.Warning("start xray failed:", err)
