@@ -466,6 +466,9 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 	oldInbound.ExpiryTime = inbound.ExpiryTime
                  // 中文注释：确保在更新数据时，将前端传来的 deviceLimit 值赋给从数据库中读出的旧对象。
 	oldInbound.DeviceLimit = inbound.DeviceLimit
+	// 【开源增强】周期重置策略随入站一起更新；LastResetTime 由调度器维护，不回写
+	oldInbound.ResetPeriod = inbound.ResetPeriod
+	oldInbound.ResetDay = inbound.ResetDay
 	oldInbound.Listen = inbound.Listen
 	oldInbound.Port = inbound.Port
 	oldInbound.Protocol = inbound.Protocol
