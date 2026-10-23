@@ -328,6 +328,7 @@
 "presetLabel" = "Protocol preset"
 "presetReality" = "VLESS + TCP + Reality + Vision (recommended)"
 "presetRealityNoVision" = "VLESS + TCP + Reality (no Vision, wider client support)"
+"presetRealityUDP443" = "VLESS + TCP + Reality + Vision + UDP443 (xtls-rprx-vision-udp443)"
 "presetTls" = "VLESS + TCP + TLS (needs cert, best compatibility)"
 "presetTrojan" = "Trojan + TLS (needs cert)"
 "certHint" = "This preset uses the HTTPS certificate configured in Settings. Fill the domain that matches the certificate, or leave empty to use the current hostname. Pick this when your client cannot use Reality."

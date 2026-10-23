@@ -334,6 +334,7 @@
 "presetLabel" = "协议预设"
 "presetReality" = "VLESS + TCP + Reality + Vision（推荐）"
 "presetRealityNoVision" = "VLESS + TCP + Reality（无 Vision，兼容老客户端）"
+"presetRealityUDP443" = "VLESS + TCP + Reality + Vision + UDP443（xtls-rprx-vision-udp443）"
 "presetTls" = "VLESS + TCP + TLS（需证书，兼容性最好）"
 "presetTrojan" = "Trojan + TLS（需证书）"
 "certHint" = "此预设使用面板【设置】里已配置的 HTTPS 证书；域名填证书对应的域名，留空则用当前访问域名。Shadowrocket 无法用 Reality 时选这个即可。"

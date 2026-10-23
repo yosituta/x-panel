@@ -24,6 +24,7 @@ import (
 //
 //	reality           VLESS + TCP + Reality + Vision（默认，最新客户端）
 //	reality-novision  VLESS + TCP + Reality（不带 flow，兼容老版 Shadowrocket / v2rayN）
+//	reality-udp443    VLESS + TCP + Reality + Vision + UDP443（xtls-rprx-vision-udp443）
 //	tls               VLESS + TCP + TLS（用面板已配置的证书，任何客户端都支持）
 //	trojan            Trojan + TCP + TLS（同上）
 //
@@ -34,6 +35,7 @@ import (
 const (
 	PresetReality         = "reality"
 	PresetRealityNoVision = "reality-novision"
+	PresetRealityUDP443   = "reality-udp443"
 	PresetTLS             = "tls"
 	PresetTrojan          = "trojan"
 
@@ -187,10 +189,13 @@ func buildInbound(o *BatchDeployOptions, port int, domain, remark string, creds 
 	deployed := &DeployedInbound{Remark: remark, Preset: preset, Port: port}
 
 	switch preset {
-	case PresetReality, PresetRealityNoVision:
+	case PresetReality, PresetRealityNoVision, PresetRealityUDP443:
 		flow := "xtls-rprx-vision"
-		if preset == PresetRealityNoVision {
+		switch preset {
+		case PresetRealityNoVision:
 			flow = ""
+		case PresetRealityUDP443:
+			flow = "xtls-rprx-vision-udp443"
 		}
 		clientUUID := uuid.NewString()
 		privateKey, publicKey, err := genX25519()
@@ -315,10 +320,13 @@ func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 		fp = DefaultFingerprint
 	}
 	switch d.Preset {
-	case PresetReality, PresetRealityNoVision:
+	case PresetReality, PresetRealityNoVision, PresetRealityUDP443:
 		flow := ""
-		if d.Preset == PresetReality {
+		switch d.Preset {
+		case PresetReality:
 			flow = "&flow=xtls-rprx-vision"
+		case PresetRealityUDP443:
+			flow = "&flow=xtls-rprx-vision-udp443"
 		}
 		return fmt.Sprintf(
 			"vless://%s@%s:%d?type=tcp&encryption=none&security=reality&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%%2F%s#%s",
@@ -385,7 +393,7 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 
 	// Reality 预设需要偷用域名（未指定则探测一个可用的）
 	domain := o.Domain
-	if o.Preset == PresetReality || o.Preset == PresetRealityNoVision {
+	if o.Preset == PresetReality || o.Preset == PresetRealityNoVision || o.Preset == PresetRealityUDP443 {
 		if domain == "" {
 			var domainService RealityDomainService
 			domain = domainService.RandomAliveDomain(3 * time.Second).Domain

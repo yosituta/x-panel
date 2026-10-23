@@ -103,6 +103,27 @@ func TestBuildRealityNoVisionHasNoFlow(t *testing.T) {
 	}
 }
 
+func TestBuildRealityUDP443(t *testing.T) {
+	o := &BatchDeployOptions{Count: 1, RemarkPrefix: "udp", Fingerprint: "chrome",
+		Host: "1.2.3.4", Preset: PresetRealityUDP443}
+	in, d, err := buildInbound(o, 23459, "www.microsoft.com", "udp-01", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var settings map[string]any
+	_ = json.Unmarshal([]byte(in.Settings), &settings)
+	c := settings["clients"].([]any)[0].(map[string]any)
+	if c["flow"] != "xtls-rprx-vision-udp443" {
+		t.Fatalf("flow 应为 xtls-rprx-vision-udp443，实际 %v", c["flow"])
+	}
+	if !strings.Contains(d.Link, "flow=xtls-rprx-vision-udp443") {
+		t.Fatalf("链接应带 udp443 flow: %s", d.Link)
+	}
+	if !strings.Contains(d.Link, "security=reality") {
+		t.Fatalf("仍应是 Reality 链接: %s", d.Link)
+	}
+}
+
 func TestBuildTLSInbound(t *testing.T) {
 	o := &BatchDeployOptions{Count: 1, RemarkPrefix: "tls", Fingerprint: "chrome",
 		Host: "us1.example.com", Preset: PresetTLS}

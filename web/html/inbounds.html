@@ -718,10 +718,11 @@
       <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
         <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.presetLabel" }}`">
           <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
-            <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetLabelReality" }}</a-select-option>
-            <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetLabelRealityNoVision" }}</a-select-option>
-            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetLabelTls" }}</a-select-option>
-            <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetLabelTrojan" }}</a-select-option>
+            <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
+            <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
+            <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
+            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
+            <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetTrojan" }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-row :gutter="16">
