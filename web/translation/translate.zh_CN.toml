@@ -331,6 +331,12 @@
 
 [pages.inbounds.oneClick]
 "title" = "一键配置"
+"presetLabel" = "协议预设"
+"presetReality" = "VLESS + TCP + Reality + Vision（推荐）"
+"presetRealityNoVision" = "VLESS + TCP + Reality（无 Vision，兼容老客户端）"
+"presetTls" = "VLESS + TCP + TLS（需证书，兼容性最好）"
+"presetTrojan" = "Trojan + TLS（需证书）"
+"certHint" = "此预设使用面板【设置】里已配置的 HTTPS 证书；域名填证书对应的域名，留空则用当前访问域名。Shadowrocket 无法用 Reality 时选这个即可。"
 "tip" = "批量生成 VLESS + TCP + Reality + Vision 入站，每条自动分配独立端口、UUID、x25519 密钥与 shortId，并自动热加载到 Xray。请确保所选端口段已放行。"
 "count" = "生成数量"
 "startPort" = "起始端口"

@@ -716,6 +716,14 @@
       </a-alert>
 
       <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
+        <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.presetLabel" }}`">
+          <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
+            <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetLabelReality" }}</a-select-option>
+            <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetLabelRealityNoVision" }}</a-select-option>
+            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetLabelTls" }}</a-select-option>
+            <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetLabelTrojan" }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.count" }}`">
@@ -748,8 +756,12 @@
           <a-input v-model.trim="oneClickForm.domain"
             :placeholder="`{{ i18n "pages.inbounds.oneClick.domainPlaceholder" }}`">
             <a-button slot="addonAfter" size="small" icon="shuffle" :loading="oneClickDomainLoading"
+              v-if="oneClickForm.preset === 'reality' || oneClickForm.preset === 'reality-novision'"
               @click="pickRealityDomain">{{ i18n "pages.inbounds.oneClick.pickDomain" }}</a-button>
           </a-input>
+          <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'tls' || oneClickForm.preset === 'trojan'">
+            {{ i18n "pages.inbounds.oneClick.certHint" }}
+          </div>
         </a-form-item>
 
         <a-form-item :wrapper-col="{ md: {span: 15, offset: 7} }">
@@ -954,6 +966,7 @@
             oneClickDomainLoading: false,
             oneClickResult: null,
             oneClickForm: {
+                preset: 'reality',
                 count: 10,
                 startPort: 0,
                 remarkPrefix: 'reality',
@@ -1230,11 +1243,13 @@ async openPort(port) {
                 this.oneClickLoading = true;
                 this.oneClickResult = null;
                 try {
+                    const isTlsPreset = (form.preset === 'tls' || form.preset === 'trojan');
                     const msg = await HttpUtil.post('/panel/api/inbounds/batchDeployReality', {
+                        preset: form.preset || 'reality',
                         count: form.count,
                         startPort: form.startPort || 0,
                         remarkPrefix: form.remarkPrefix || 'reality',
-                        domain: form.domain || '',
+                        domain: isTlsPreset ? (form.domain || window.location.hostname) : (form.domain || ''),
                         totalGB: form.totalGB || 0,
                         host: window.location.hostname,
                     });
@@ -1260,6 +1275,7 @@ async openPort(port) {
 
             resetOneClickForm() {
                 this.oneClickForm = {
+                    preset: 'reality',
                     count: 10,
                     startPort: 0,
                     remarkPrefix: 'reality',

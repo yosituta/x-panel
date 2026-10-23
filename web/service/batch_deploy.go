@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"x-ui/database/model"
@@ -18,18 +19,30 @@ import (
 
 // 中文注释: 【开源增强】“一键配置 / 批量部署节点”。
 //
-// 依据上游 README 的描述复刻：一次点击批量生成 N 条
-// VLESS + TCP + Reality + Vision 入站，每条使用独立的
-// 端口、UUID、x25519 密钥对与 shortId，并直接热加载进 Xray。
+// 一次点击批量生成 N 条入站，每条使用独立的端口、UUID、密钥，并直接热加载进 Xray。
+// 支持 4 种预设，覆盖不同客户端的兼容性：
 //
-// 与上游 PRO 版的实现无关，全部为本仓库自行实现的逻辑。
+//	reality           VLESS + TCP + Reality + Vision（默认，最新客户端）
+//	reality-novision  VLESS + TCP + Reality（不带 flow，兼容老版 Shadowrocket / v2rayN）
+//	tls               VLESS + TCP + TLS（用面板已配置的证书，任何客户端都支持）
+//	trojan            Trojan + TCP + TLS（同上）
+//
+// 为什么需要 non-Reality 预设：部分客户端（尤其 iOS 上的旧版/共享版 Shadowrocket）
+// 对 REALITY 支持不完整，表现是“延迟测试通过、但一个字节都传不出去”。
+// 这时换 TLS 预设即可，不需要换服务器。
 
 const (
+	PresetReality         = "reality"
+	PresetRealityNoVision = "reality-novision"
+	PresetTLS             = "tls"
+	PresetTrojan          = "trojan"
+
 	DefaultBatchCount   = 10
 	DefaultBatchPrefix  = "reality"
 	DefaultFingerprint  = "chrome"
 	DefaultSpiderX      = "/"
-	minBatchPort        = 20000
+	defaultBatchPort    = 20000 // 未指定时的默认起始端口
+	minUsablePort       = 1024  // 允许用户指定 1024 起的端口（如 2053 / 443 之外的常用端口）
 	maxBatchPort        = 60000
 	batchPortMaxRetries = 4096
 )
@@ -40,23 +53,26 @@ type BatchDeployOptions struct {
 	Count        int    `json:"count" form:"count"`               // 生成条数，默认 10
 	StartPort    int    `json:"startPort" form:"startPort"`       // 起始端口，0 表示自动挑选
 	RemarkPrefix string `json:"remarkPrefix" form:"remarkPrefix"` // 备注前缀
-	Domain       string `json:"domain" form:"domain"`             // 偷用的域名，空则自动探测
+	Domain       string `json:"domain" form:"domain"`             // Reality: 偷用域名；TLS: 证书域名
 	Listen       string `json:"listen" form:"listen"`             // 监听地址，默认空（全部地址）
 	Fingerprint  string `json:"fingerprint" form:"fingerprint"`   // uTLS 指纹
-	TotalGB      int64  `json:"totalGB" form:"totalGB"`           // 单条入站流量上限（0=不限）
+	TotalGB      int64  `json:"totalGB" form:"totalGB"`           // 单条入站流量上限（GB，0=不限）
 	ExpiryTime   int64  `json:"expiryTime" form:"expiryTime"`     // 到期时间（0=不过期）
 	Host         string `json:"host" form:"host"`                 // 生成分享链接用的地址
+	Preset       string `json:"preset" form:"preset"`             // 预设协议，见上方常量
 }
 
 // DeployedInbound 单条部署结果
 type DeployedInbound struct {
 	Id         int    `json:"id"`
 	Remark     string `json:"remark"`
+	Preset     string `json:"preset"`
 	Port       int    `json:"port"`
 	UUID       string `json:"uuid"`
-	PublicKey  string `json:"publicKey"`
-	ShortId    string `json:"shortId"`
-	ServerName string `json:"serverName"`
+	Password   string `json:"password,omitempty"`
+	PublicKey  string `json:"publicKey,omitempty"`
+	ShortId    string `json:"shortId,omitempty"`
+	ServerName string `json:"serverName,omitempty"`
 	Link       string `json:"link"`
 }
 
@@ -69,7 +85,13 @@ type BatchDeployResult struct {
 
 type BatchDeployService struct{}
 
-// genX25519 生成 Reality 所需的 x25519 密钥对（base64url raw 编码，与 xray x25519 输出一致）
+// tlsCreds TLS 预设要用的证书信息
+type tlsCreds struct {
+	CertFile   string
+	KeyFile    string
+	ServerName string
+}
+
 func genX25519() (privateKey, publicKey string, err error) {
 	curve := ecdh.X25519()
 	key, err := curve.GenerateKey(rand.Reader)
@@ -81,7 +103,6 @@ func genX25519() (privateKey, publicKey string, err error) {
 	return privateKey, publicKey, nil
 }
 
-// genShortId 生成 8 位十六进制 shortId
 func genShortId() (string, error) {
 	buf := make([]byte, 4)
 	if _, err := rand.Read(buf); err != nil {
@@ -90,7 +111,14 @@ func genShortId() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// portAvailable 判断端口是否可绑定
+func genPassword(n int) (string, error) {
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
 func portAvailable(port int) bool {
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -100,124 +128,214 @@ func portAvailable(port int) bool {
 	return true
 }
 
-// buildVlessRealityInbound 组装一条 VLESS+TCP+Reality+Vision 入站（纯函数，便于单测）
-func buildVlessRealityInbound(o *BatchDeployOptions, port int, domain, remark string) (*model.Inbound, *DeployedInbound, error) {
-	clientUUID := uuid.NewString()
-	privateKey, publicKey, err := genX25519()
-	if err != nil {
-		return nil, nil, err
+func buildTag(o *BatchDeployOptions, port int) string {
+	if o.Listen != "" && o.Listen != "0.0.0.0" && o.Listen != "::" {
+		return fmt.Sprintf("inbound-%s:%d", o.Listen, port)
 	}
-	shortId, err := genShortId()
-	if err != nil {
-		return nil, nil, err
-	}
+	return fmt.Sprintf("inbound-%d", port)
+}
 
-	email := fmt.Sprintf("vless-%d", port)
-	now := time.Now().UnixMilli()
-	// 前端传入的 TotalGB 为 GB，模型内统一用字节
-	totalBytes := o.TotalGB * 1024 * 1024 * 1024
+// newClient 生成统一的客户端配置片段
+func newVlessClient(id, email, flow string, totalBytes, expiry int64, now int64) map[string]any {
+	return map[string]any{
+		"id": id, "flow": flow, "email": email, "limitIp": 0,
+		"totalGB": totalBytes, "expiryTime": expiry, "enable": true,
+		"tgId": 0, "subId": "", "comment": "", "reset": 0,
+		"created_at": now, "updated_at": now,
+	}
+}
 
-	settings := map[string]any{
-		"clients": []map[string]any{{
-			"id":         clientUUID,
-			"flow":       "xtls-rprx-vision",
-			"email":      email,
-			"limitIp":    0,
-			"totalGB":    totalBytes,
-			"expiryTime": o.ExpiryTime,
-			"enable":     true,
-			"tgId":       0,
-			"subId":      "",
-			"comment":    "",
-			"reset":      0,
-			"created_at": now,
-			"updated_at": now,
-		}},
-		"decryption": "none",
-		"fallbacks":  []any{},
+func mustJSON(v any) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "{}"
 	}
-	streamSettings := map[string]any{
-		"network":  "tcp",
-		"security": "reality",
-		"realitySettings": map[string]any{
-			"show":        false,
-			"xver":        0,
-			"dest":        net.JoinHostPort(domain, "443"),
-			"serverNames": []string{domain},
-			"privateKey":  privateKey,
-			"shortIds":    []string{shortId},
-			"settings": map[string]any{
-				"publicKey":   publicKey,
-				"fingerprint": o.Fingerprint,
-				"serverName":  "",
-				"spiderX":     DefaultSpiderX,
-			},
-		},
-	}
-	sniffing := map[string]any{
+	return string(b)
+}
+
+func defaultSniffing() map[string]any {
+	return map[string]any{
 		"enabled":      false,
 		"destOverride": []string{"http", "tls", "quic"},
 		"metadataOnly": false,
 		"routeOnly":    false,
 	}
+}
 
-	settingsBytes, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return nil, nil, err
+// buildInbound 按预设组装一条入站（纯函数，便于单测）
+func buildInbound(o *BatchDeployOptions, port int, domain, remark string, creds *tlsCreds) (*model.Inbound, *DeployedInbound, error) {
+	preset := o.Preset
+	if preset == "" {
+		preset = PresetReality
 	}
-	streamBytes, err := json.MarshalIndent(streamSettings, "", "  ")
-	if err != nil {
-		return nil, nil, err
-	}
-	sniffingBytes, err := json.MarshalIndent(sniffing, "", "  ")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	tag := fmt.Sprintf("inbound-%d", port)
-	if o.Listen != "" && o.Listen != "0.0.0.0" && o.Listen != "::" {
-		tag = fmt.Sprintf("inbound-%s:%d", o.Listen, port)
-	}
+	email := fmt.Sprintf("%s-%d", strings.SplitN(preset, "-", 2)[0], port)
+	now := time.Now().UnixMilli()
+	totalBytes := o.TotalGB * 1024 * 1024 * 1024
 
 	inbound := &model.Inbound{
-		UserId:         o.UserId,
-		Remark:         remark,
-		Enable:         true,
-		ExpiryTime:     o.ExpiryTime,
-		Total:          totalBytes,
-		Listen:         o.Listen,
-		Port:           port,
-		Protocol:       model.VLESS,
-		Settings:       string(settingsBytes),
-		StreamSettings: string(streamBytes),
-		Sniffing:       string(sniffingBytes),
-		Tag:            tag,
-		ResetPeriod:    ResetPeriodNever,
-		ResetDay:       1,
+		UserId:      o.UserId,
+		Remark:      remark,
+		Enable:      true,
+		ExpiryTime:  o.ExpiryTime,
+		Total:       totalBytes,
+		Listen:      o.Listen,
+		Port:        port,
+		Tag:         buildTag(o, port),
+		ResetPeriod: ResetPeriodNever,
+		ResetDay:    1,
+	}
+	deployed := &DeployedInbound{Remark: remark, Preset: preset, Port: port}
+
+	switch preset {
+	case PresetReality, PresetRealityNoVision:
+		flow := "xtls-rprx-vision"
+		if preset == PresetRealityNoVision {
+			flow = ""
+		}
+		clientUUID := uuid.NewString()
+		privateKey, publicKey, err := genX25519()
+		if err != nil {
+			return nil, nil, err
+		}
+		shortId, err := genShortId()
+		if err != nil {
+			return nil, nil, err
+		}
+		inbound.Protocol = model.VLESS
+		inbound.Settings = mustJSON(map[string]any{
+			"clients":    []map[string]any{newVlessClient(clientUUID, email, flow, totalBytes, o.ExpiryTime, now)},
+			"decryption": "none",
+			"fallbacks":  []any{},
+		})
+		inbound.StreamSettings = mustJSON(map[string]any{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]any{
+				"show":        false,
+				"xver":        0,
+				"dest":        net.JoinHostPort(domain, "443"),
+				"serverNames": []string{domain},
+				"privateKey":  privateKey,
+				"shortIds":    []string{shortId},
+				"settings": map[string]any{
+					"publicKey":   publicKey,
+					"fingerprint": o.Fingerprint,
+					"serverName":  "",
+					"spiderX":     DefaultSpiderX,
+				},
+			},
+		})
+		inbound.Sniffing = mustJSON(defaultSniffing())
+		deployed.UUID = clientUUID
+		deployed.PublicKey = publicKey
+		deployed.ShortId = shortId
+		deployed.ServerName = domain
+
+	case PresetTLS:
+		if creds == nil || creds.CertFile == "" || creds.KeyFile == "" {
+			return nil, nil, fmt.Errorf("TLS 预设需要在面板【设置】里配置证书（webCertFile / webKeyFile）")
+		}
+		clientUUID := uuid.NewString()
+		inbound.Protocol = model.VLESS
+		inbound.Settings = mustJSON(map[string]any{
+			"clients":    []map[string]any{newVlessClient(clientUUID, email, "", totalBytes, o.ExpiryTime, now)},
+			"decryption": "none",
+			"fallbacks":  []any{},
+		})
+		inbound.StreamSettings = mustJSON(map[string]any{
+			"network":  "tcp",
+			"security": "tls",
+			"tlsSettings": map[string]any{
+				"serverName": creds.ServerName,
+				"alpn":       []string{"h2", "http/1.1"},
+				"certificates": []map[string]any{{
+					"certificateFile": creds.CertFile,
+					"keyFile":         creds.KeyFile,
+				}},
+			},
+		})
+		sniff := defaultSniffing()
+		sniff["enabled"] = true
+		inbound.Sniffing = mustJSON(sniff)
+		deployed.UUID = clientUUID
+		deployed.ServerName = creds.ServerName
+
+	case PresetTrojan:
+		if creds == nil || creds.CertFile == "" || creds.KeyFile == "" {
+			return nil, nil, fmt.Errorf("Trojan 预设需要在面板【设置】里配置证书（webCertFile / webKeyFile）")
+		}
+		password, err := genPassword(16)
+		if err != nil {
+			return nil, nil, err
+		}
+		inbound.Protocol = model.Trojan
+		inbound.Settings = mustJSON(map[string]any{
+			"clients": []map[string]any{{
+				"password": password, "email": email, "limitIp": 0,
+				"totalGB": totalBytes, "expiryTime": o.ExpiryTime, "enable": true,
+				"tgId": 0, "subId": "", "comment": "", "reset": 0,
+				"created_at": now, "updated_at": now,
+			}},
+			"fallbacks": []any{},
+		})
+		inbound.StreamSettings = mustJSON(map[string]any{
+			"network":  "tcp",
+			"security": "tls",
+			"tlsSettings": map[string]any{
+				"serverName": creds.ServerName,
+				"alpn":       []string{"h2", "http/1.1"},
+				"certificates": []map[string]any{{
+					"certificateFile": creds.CertFile,
+					"keyFile":         creds.KeyFile,
+				}},
+			},
+		})
+		sniff := defaultSniffing()
+		sniff["enabled"] = true
+		inbound.Sniffing = mustJSON(sniff)
+		deployed.Password = password
+		deployed.ServerName = creds.ServerName
+
+	default:
+		return nil, nil, fmt.Errorf("未知预设: %s", preset)
 	}
 
-	deployed := &DeployedInbound{
-		Remark:     remark,
-		Port:       port,
-		UUID:       clientUUID,
-		PublicKey:  publicKey,
-		ShortId:    shortId,
-		ServerName: domain,
-	}
-	deployed.Link = buildVlessLink(o, deployed)
-
+	deployed.Link = buildLink(o, deployed)
 	return inbound, deployed, nil
 }
 
-// buildVlessLink 组装 vless:// 分享链接
-func buildVlessLink(o *BatchDeployOptions, d *DeployedInbound) string {
+// buildLink 生成分享链接
+func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 	if o.Host == "" {
 		return ""
 	}
-	return fmt.Sprintf(
-		"vless://%s@%s:%d?type=tcp&security=reality&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%%2F&flow=xtls-rprx-vision#%s",
-		d.UUID, o.Host, d.Port, d.PublicKey, o.Fingerprint, d.ServerName, d.ShortId, d.Remark,
-	)
+	host := o.Host
+	fp := o.Fingerprint
+	if fp == "" {
+		fp = DefaultFingerprint
+	}
+	switch d.Preset {
+	case PresetReality, PresetRealityNoVision:
+		flow := ""
+		if d.Preset == PresetReality {
+			flow = "&flow=xtls-rprx-vision"
+		}
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=tcp&encryption=none&security=reality&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%%2F%s#%s",
+			d.UUID, host, d.Port, d.PublicKey, fp, d.ServerName, d.ShortId, flow, d.Remark,
+		)
+	case PresetTLS:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=tcp&encryption=none&security=tls&sni=%s&fp=%s#%s",
+			d.UUID, host, d.Port, d.ServerName, fp, d.Remark,
+		)
+	case PresetTrojan:
+		return fmt.Sprintf(
+			"trojan://%s@%s:%d?security=tls&sni=%s&fp=%s#%s",
+			d.Password, host, d.Port, d.ServerName, fp, d.Remark,
+		)
+	}
+	return ""
 }
 
 // Deploy 执行批量部署。返回 (结果, 是否需要重启 Xray, 错误)
@@ -237,23 +355,46 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 	if o.Fingerprint == "" {
 		o.Fingerprint = DefaultFingerprint
 	}
+	if o.Preset == "" {
+		o.Preset = PresetReality
+	}
 
 	result := &BatchDeployResult{
 		Created: make([]DeployedInbound, 0, o.Count),
 		Failed:  make([]string, 0),
 	}
 
-	// 1. 选定偷用域名（未指定则探测一个可用的）
-	domain := o.Domain
-	if domain == "" {
-		var domainService RealityDomainService
-		domain = domainService.RandomAliveDomain(3 * time.Second).Domain
+	// TLS / Trojan 预设需要证书：取面板设置里的证书，域名优先用请求里的 Domain，其次 Host
+	var creds *tlsCreds
+	if o.Preset == PresetTLS || o.Preset == PresetTrojan {
+		var settingService SettingService
+		cert, err1 := settingService.GetCertFile()
+		key, err2 := settingService.GetKeyFile()
+		if err1 != nil || err2 != nil || cert == "" || key == "" {
+			return nil, false, fmt.Errorf("TLS/Trojan 预设需要先在面板【设置】里配置 HTTPS 证书")
+		}
+		serverName := o.Domain
+		if serverName == "" {
+			serverName = o.Host
+		}
+		if serverName == "" {
+			return nil, false, fmt.Errorf("TLS/Trojan 预设需要提供域名（证书对应的域名）")
+		}
+		creds = &tlsCreds{CertFile: cert, KeyFile: key, ServerName: serverName}
 	}
 
-	// 2. 端口起点
+	// Reality 预设需要偷用域名（未指定则探测一个可用的）
+	domain := o.Domain
+	if o.Preset == PresetReality || o.Preset == PresetRealityNoVision {
+		if domain == "" {
+			var domainService RealityDomainService
+			domain = domainService.RandomAliveDomain(3 * time.Second).Domain
+		}
+	}
+
 	port := o.StartPort
-	if port <= 0 || port < minBatchPort || port > maxBatchPort {
-		port = minBatchPort
+	if port < minUsablePort || port > maxBatchPort {
+		port = defaultBatchPort
 	}
 
 	var inboundService InboundService
@@ -261,7 +402,6 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 	attempts := 0
 
 	for i := 0; i < o.Count; i++ {
-		// 找一个可用端口（既要能绑定，也要没被现有入站占用）
 		for {
 			if attempts > batchPortMaxRetries {
 				result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: 找不到可用端口", i+1))
@@ -286,12 +426,14 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		}
 
 		remark := fmt.Sprintf("%s-%02d", o.RemarkPrefix, i+1)
-		inbound, deployed, err := buildVlessRealityInbound(o, port, domain, remark)
+		inbound, deployed, err := buildInbound(o, port, domain, remark, creds)
 		if err != nil {
+			logger.Warningf("批量部署第 %d 条组装失败: %v", i+1, err)
 			result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: %v", i+1, err))
 			port++
 			continue
 		}
+
 		saved, restart, err := inboundService.AddInbound(inbound)
 		if err != nil {
 			logger.Warningf("批量部署第 %d 条失败: %v", i+1, err)
