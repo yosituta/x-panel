@@ -20,28 +20,31 @@ type RealityDomain struct {
 	SNI    string `json:"sni"`    // 填到 reality.serverNames
 }
 
-// 候选域名池：均为长期稳定、支持 TLS1.3 + H2 的大厂站点
+// 候选域名池：Reality 的“偷用域名”。
+//
+// 选型要求（踩过坑，别乱加）：
+//  1. 支持 TLS 1.3 + HTTP/2，且 443 直连可达（本服务会实际探测）；
+//  2. **优先非 CDN 站点**。Cloudflare / Akamai 前置的域名（cloudflare.com、
+//     zoom.us、bing.com、skype.com、amazon.com 等）会按客户端指纹协商
+//     混合密钥交换（X25519MLKEM768），一旦触发 HelloRetryRequest 或协商到
+//     iOS 客户端不支持的组，Reality 握手就会在客户端侧失败——
+//     表现为“App 延迟测试能过、但一个字节都传不出去”。
+//  3. 站点要长期稳定、不频繁改证书/跳转。
 var realityDomainPool = []string{
 	"www.microsoft.com",
 	"www.apple.com",
-	"www.cloudflare.com",
-	"www.amazon.com",
+	"www.icloud.com",
 	"www.tesla.com",
 	"www.nvidia.com",
-	"www.samsung.com",
-	"www.adobe.com",
 	"www.intel.com",
+	"www.samsung.com",
 	"www.oracle.com",
 	"www.ibm.com",
-	"www.salesforce.com",
-	"www.zoom.us",
-	"www.bing.com",
-	"www.skype.com",
-	"dl.google.com",
-	"www.python.org",
-	"www.golang.org",
 	"www.docker.com",
+	"www.python.org",
 	"www.mozilla.org",
+	"www.adobe.com",
+	"www.salesforce.com",
 }
 
 type RealityDomainService struct{}
