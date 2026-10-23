@@ -14,6 +14,7 @@ BASE="${BASE:-http://127.0.0.1:13688}"
 USER_NAME="${XUI_USER:-admin}"
 PASS="${XUI_PASS:-admin}"
 JAR="${JAR:-./.e2e-cookie.txt}"
+CURL="${CURL:-curl -sS}"   # 自签证书场景可传 CURL="$CURL -k"
 PAYLOAD="./.e2e-payload.json"
 CHECKFILE="./.e2e-check.json"
 cleanup_files() { rm -f "$JAR" "$PAYLOAD" "$CHECKFILE"; }
@@ -39,18 +40,18 @@ PY
 }
 
 echo "== 1. 登录 =="
-R=$(curl -sS -c "$JAR" -X POST -d "username=$USER_NAME&password=$PASS" "$BASE/login")
+R=$($CURL -c "$JAR" -X POST -d "username=$USER_NAME&password=$PASS" "$BASE/login")
 check "$R" 'd["success"] is True' || fail "登录失败: $R"
 pass "登录成功"
 
 echo "== 2. 读取入站列表 =="
-R=$(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/list")
+R=$($CURL -b "$JAR" "$BASE/panel/api/inbounds/list")
 check "$R" 'd["success"] is True' || fail "列表接口异常: $R"
 BEFORE=$(printf '%s' "$R" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)["obj"]))')
 pass "当前入站数：$BEFORE"
 
 echo "== 3. 一键配置：批量部署 2 条 VLESS+Reality+Vision =="
-R=$(curl -sS -b "$JAR" -H "Content-Type: application/json" -X POST \
+R=$($CURL -b "$JAR" -H "Content-Type: application/json" -X POST \
     -d '{"count":2,"remarkPrefix":"e2e","host":"203.0.113.9"}' \
     "$BASE/panel/api/inbounds/batchDeployReality")
 check "$R" 'd["success"] is True and len(d["obj"]["created"]) == 2 and len(d["obj"]["failed"]) == 0' \
@@ -62,7 +63,7 @@ PORT1=$(printf '%s' "$R" | python3 -c 'import json,sys;print(json.load(sys.stdin
 pass "批量部署成功"
 
 echo "== 4. 校验落库结果（数量 / 协议 / tag / Reality 配置） =="
-R=$(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/list")
+R=$($CURL -b "$JAR" "$BASE/panel/api/inbounds/list")
 check "$R" 'len(d["obj"]) == '"$((BEFORE + 2))" || fail "入站数量不正确"
 check "$R" 'any(i["port"]=='"$PORT1"' and i["protocol"]=="vless" and "reality" in i["streamSettings"] and i["tag"].startswith("inbound-") for i in d["obj"])' \
     || fail "新入站字段不正确"
@@ -87,10 +88,10 @@ cat > "$PAYLOAD" <<JSON
   "resetDay": 12
 }
 JSON
-R=$(curl -sS -b "$JAR" -H "Content-Type: application/json" -X POST -d @"$PAYLOAD" "$BASE/panel/api/inbounds/add")
+R=$($CURL -b "$JAR" -H "Content-Type: application/json" -X POST -d @"$PAYLOAD" "$BASE/panel/api/inbounds/add")
 check "$R" 'd["success"] is True' || fail "新建入站失败: $R"
 NEWID=$(printf '%s' "$R" | python3 -c 'import json,sys;print(json.load(sys.stdin)["obj"]["id"])')
-R=$(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/get/$NEWID")
+R=$($CURL -b "$JAR" "$BASE/panel/api/inbounds/get/$NEWID")
 check "$R" 'd["obj"]["resetPeriod"] == "monthly" and d["obj"]["resetDay"] == 12' \
     || fail "重置字段未保存: $R"
 pass "新建时 resetPeriod=monthly / resetDay=12 已保存"
@@ -104,20 +105,20 @@ s = io.open(p, encoding="utf-8").read().replace('"resetPeriod": "monthly"', '"re
 io.open(p, "w", encoding="utf-8").write(s)
 PY
 rm -f "$PAYLOAD.bak"
-R=$(curl -sS -b "$JAR" -H "Content-Type: application/json" -X POST -d @"$PAYLOAD" "$BASE/panel/api/inbounds/update/$NEWID")
+R=$($CURL -b "$JAR" -H "Content-Type: application/json" -X POST -d @"$PAYLOAD" "$BASE/panel/api/inbounds/update/$NEWID")
 check "$R" 'd["success"] is True' || fail "编辑入站失败: $R"
-R=$(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/get/$NEWID")
+R=$($CURL -b "$JAR" "$BASE/panel/api/inbounds/get/$NEWID")
 check "$R" 'd["obj"]["resetPeriod"] == "daily"' || fail "编辑后字段未更新: $R"
 pass "编辑后 resetPeriod=daily 已生效（此处曾因逐字段拷贝遗漏而静默失效）"
 
 echo "== 7. 清理测试数据 =="
-for id in $(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/list" | python3 -c '
+for id in $($CURL -b "$JAR" "$BASE/panel/api/inbounds/list" | python3 -c '
 import json,sys
 for i in json.loads(sys.stdin.read())["obj"]:
     if i["remark"].startswith("e2e"): print(i["id"])' | tr -d '\r'); do
-    curl -sS -b "$JAR" -X POST "$BASE/panel/api/inbounds/del/$id" >/dev/null
+    $CURL -b "$JAR" -X POST "$BASE/panel/api/inbounds/del/$id" >/dev/null
 done
-R=$(curl -sS -b "$JAR" "$BASE/panel/api/inbounds/list")
+R=$($CURL -b "$JAR" "$BASE/panel/api/inbounds/list")
 check "$R" 'len([i for i in d["obj"] if i["remark"].startswith("e2e")]) == 0' \
     || fail "清理后仍有 e2e 入站"
 pass "已清理 e2e 测试入站"

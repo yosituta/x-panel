@@ -33,6 +33,19 @@
 - x25519 密钥用 `crypto/ecdh` 生成，输出格式与 `xray x25519` 一致
   （base64url raw，43 字符），**不依赖 xray 二进制**，因此可离线单测。
 
+## 真实服务器实测（Ubuntu 24.04 / 1 核 458MB / KVM）
+
+用 `scripts/deploy-vps.sh` 部署到一台干净 VPS（systemd 管理，面板 + xray 同进程树）：
+
+| 验证项 | 结果 |
+| --- | --- |
+| 构建 | 服务器 1 核编译 xray-core 过慢（swap 抖动 20+ 分钟未完成），改用 `zig cc -target x86_64-linux-gnu` 在本地交叉编译，2.5 分钟出 67MB 二进制，服务器直接运行 |
+| 服务 | `x-panel.service` active，面板监听 0.0.0.0:23333（HTTPS，自签证书），xray 作为子进程随面板启动 |
+| e2e 脚本 | 服务器上 7/7 通过（`CURL="curl -sS -k"`） |
+| 真实代理链路 | 用批量部署生成的节点建 xray 客户端 → socks5 → Reality 入站 → freedom 出网，`api.ipify.org` / `cloudflare/cdn-cgi/trace` 均返回成功；面板统计到 up=7353 / down=9654 |
+| 周期重置（真实流量） | 把该入站改为 daily 后，1 分钟内 7353/9654 归零，`lastResetTime` 写入当日 00:00，日志 `周期重置流量: 入站 #1` |
+| 前端 | 中英文两套文案都可正确渲染（主题选择器 5 项、入站表单重置项、一键配置弹窗） |
+
 ## 第二批（计划）
 
 | # | 功能 | 说明 | 预估 |
