@@ -23,7 +23,20 @@
 | 入站周期重置流量 | 每日 / 每周 / 每月 N 号 / 从不；到期自动清零并恢复超量停用的客户端 |
 | 首页 5 套主题 | 标准布局、炫彩动画、深海科技、暮光薰衣、幽林秘境；选定即记住，不再按单双号乱跳 |
 | Reality 随机域名 | 后端并发探测 TLS1.3 存活后随机挑选，避免配到已挂的域名 |
-| 一键配置 / 批量部署 | 一次生成 N 条 VLESS + TCP + Reality + Vision，独立端口/UUID/x25519/shortId，自动热加载并给出分享链接 |
+| 一键配置 / 批量部署 | 一次生成 N 条节点，独立端口/UUID/密钥，自动热加载并给出分享链接；预设含 auto / TLS / Reality / Trojan |
+
+## 客户端兼容性（实测）
+
+部分客户端（实测 iPhone Shadowrocket）无法与 xray 的 Reality 服务端完成握手，服务端日志表现为：
+
+```
+REALITY: processed invalid connection: authentication failed or validation criteria not met
+```
+
+此时客户端会收到伪造站点的真实证书后主动断开，表现为"测延迟正常、但打不开网页"。
+已在服务端排除证书、端口、域名、shortId 编码、密钥格式、xray 版本等因素（同一节点用 xray 官方客户端可正常出网）。
+
+**因此一键配置提供 `auto` 预设并作为默认**：面板配置了证书且通过域名访问时自动生成 TLS 节点（兼容性最好），否则退回 Reality。若你的客户端 Reality 不可用，请选 `VLESS + TCP + TLS` 或 `auto`。
 
 ## 与上游同步
 
