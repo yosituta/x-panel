@@ -58,7 +58,7 @@
 ## 每次合并上游后的检查清单
 
 1. `go build ./...`
-2. `go test -vet=off ./web ./web/service -run 'Test'`
+2. `go vet ./... && go test ./...`
 3. 重点复查冲突高发文件：
    - `database/model/model.go`（我们给 Inbound 加了 3 个字段）
    - `web/service/inbound.go`、`web/job/`（新增文件，一般不冲突）

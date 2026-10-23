@@ -53,10 +53,9 @@ go build -trimpath -ldflags "-s -w" -o x-ui.exe .
 ## 测试
 
 ```bash
-go test -vet=off ./web/service -run 'TrafficReset|Scheduled|IsDue|Gen|Build|Reality'
+go vet ./...        # 已修复上游遗留的两处 vet 告警，现在全绿
+go test ./...
 ```
-
-（`-vet=off` 是因为上游遗留两处 vet 告警，与本仓库改动无关。）
 
 ## 许可
 

@@ -3671,8 +3671,9 @@ func (t *Tgbot) randomString(length int, charset string) string {
 
 
 func (t *Tgbot) handleCallbackQuery(ctx *th.Context, cq telego.CallbackQuery) error {
-    // 1) 确保 Message 可访问 —— 注意必须调用 cq.Message.Message() 而不是直接访问 .Message
-    if cq.Message == nil || cq.Message.Message == nil {
+    // 1) 确保 Message 可访问 —— cq.Message 是 MaybeInaccessibleMessage 接口，
+    //    需调用 cq.Message.Message() 取具体消息（不可访问时返回 nil）
+    if cq.Message == nil || cq.Message.Message() == nil {
         _ = ctx.Bot().AnswerCallbackQuery(ctx, tu.CallbackQuery(cq.ID).WithText("消息对象不存在"))
         return nil
     }
