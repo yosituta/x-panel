@@ -25,6 +25,7 @@
 | Reality 随机域名 | 后端并发探测 TLS1.3 存活后随机挑选，避免配到已挂的域名 |
 | 一键配置 / 批量部署 | 一次生成 N 条节点，独立端口/UUID/密钥，自动热加载并给出分享链接；预设含 auto / TLS / Reality / Trojan |
 | 内置订阅转换 | 每个客户端自带 `subId`，`/sub/<subId>` 直接输出 V2Ray / Clash / sing-box / Surge 四种格式，无需第三方 subconverter |
+| 流量与到期告警 | 每 10 分钟扫描，用量达阈值（默认 80%）或到期前 N 天（默认 3）推送到 Telegram 管理员，同一阈值只提醒一次；`POST /panel/api/server/checkAlerts` 可手动触发 |
 
 ## 客户端兼容性（实测）
 

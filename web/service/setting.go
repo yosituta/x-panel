@@ -62,6 +62,11 @@ var defaultValueMap = map[string]string{
 	"subEncrypt":                  "true",
 	"subShowInfo":                 "true",
 	"subURI":                      "",
+	// 【开源增强】流量/到期告警（面板内可改，未设置时用这些默认值）
+	"alertEnable":          "true",
+	"alertTrafficPercent":  "80",
+	"alertExpireDays":      "3",
+	"alertNotifyState":     "{}",
 	"subJsonPath":                 "/json/",
 	"subJsonURI":                  "",
 	"subJsonFragment":             "",

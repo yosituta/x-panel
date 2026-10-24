@@ -326,6 +326,8 @@ func (s *Server) startTask() {
 
 	// 【开源增强】入站级“周期性重置流量”：每分钟检查一次是否到达重置时刻
 	s.cron.AddJob("@every 1m", job.NewTrafficResetJob())
+	// 【开源增强】每 10 分钟检查一次流量/到期告警
+	s.cron.AddJob("@every 10m", job.NewAlertJob())
 
 	// check client ips from log file every day
 	s.cron.AddJob("@daily", job.NewClearLogsJob())

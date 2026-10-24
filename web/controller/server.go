@@ -52,6 +52,8 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getRandomRealityDomain", a.getRandomRealityDomain)
 	g.GET("/getNewmlkem768", a.getNewmlkem768)
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
+	// 【开源增强】手动触发一次流量/到期检查，便于验证 Telegram 告警是否配置成功
+	g.POST("/checkAlerts", a.checkAlerts)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -381,4 +383,15 @@ func (a *ServerController) openPort(c *gin.Context) {
 	// 【中文注释】: 3. 因为服务层方法是异步的，不再检查它的 error 返回值。
 	//    直接向前端返回一个成功的消息，告知用户指令已发送。
 	jsonMsg(c, "端口放行指令已成功发送，正在后台执行...", nil)
+}
+
+// 【开源增强】手动触发一次流量/到期检查，返回本次新产生的提醒条数
+func (a *ServerController) checkAlerts(c *gin.Context) {
+	var alertService service.AlertService
+	count, err := alertService.CheckAndNotify()
+	if err != nil {
+		jsonMsg(c, "告警检查失败", err)
+		return
+	}
+	jsonObj(c, gin.H{"count": count}, nil)
 }
