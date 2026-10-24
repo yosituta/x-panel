@@ -720,13 +720,19 @@
           <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
             <a-select-option value="auto">{{ i18n "pages.inbounds.oneClick.presetAuto" }}</a-select-option>
             <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
-            <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
-            <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
-            <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
-            <a-select-option value="reality-legacy">{{ i18n "pages.inbounds.oneClick.presetRealityLegacy" }}</a-select-option>
-            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
             <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetTrojan" }}</a-select-option>
+            <template v-if="oneClickAdvanced">
+              <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
+              <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
+              <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
+              <a-select-option value="reality-legacy">{{ i18n "pages.inbounds.oneClick.presetRealityLegacy" }}</a-select-option>
+            </template>
           </a-select>
+          <div style="margin-top: 6px">
+            <a-checkbox v-model="oneClickAdvanced">
+              {{ i18n "pages.inbounds.oneClick.advancedToggle" }}
+            </a-checkbox>
+          </div>
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -970,6 +976,8 @@
             oneClickModalVisible: false,
             // 【开源增强】批量部署节点表单
             oneClickLoading: false,
+            // 【开源增强】是否显示 Reality 等高级预设（默认隐藏，避免误选到不兼容的协议）
+            oneClickAdvanced: false,
             oneClickDomainLoading: false,
             oneClickResult: null,
             oneClickForm: {

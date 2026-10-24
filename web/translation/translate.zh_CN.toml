@@ -338,6 +338,7 @@
 "presetRealityLegacy" = "VLESS + TCP + Reality + Vision（上游旧版写法，兼容性最接近原一键配置）"
 "presetAuto" = "自动（有证书用 TLS，否则 Reality）"
 "autoHint" = "自动模式：面板已配置证书且通过域名访问时生成 TLS 节点，兼容性最好；否则生成 Reality 节点。"
+"advancedToggle" = "显示高级预设（Reality 系列，部分客户端不支持）"
 "presetTls" = "VLESS + TCP + TLS（需证书，兼容性最好）"
 "presetTrojan" = "Trojan + TLS（需证书）"
 "certHint" = "此预设使用面板【设置】里已配置的 HTTPS 证书；域名填证书对应的域名，留空则用当前访问域名。Shadowrocket 无法用 Reality 时选这个即可。"

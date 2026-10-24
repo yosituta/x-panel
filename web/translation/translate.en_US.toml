@@ -332,6 +332,7 @@
 "presetRealityLegacy" = "VLESS + TCP + Reality + Vision (legacy schema, closest to the original one-click)"
 "presetAuto" = "Auto (TLS if cert configured, else Reality)"
 "autoHint" = "Auto mode: generates TLS nodes when the panel has a certificate and is accessed via a domain (best compatibility); otherwise generates Reality nodes."
+"advancedToggle" = "Show advanced presets (Reality family; some clients don't support it)"
 "presetTls" = "VLESS + TCP + TLS (needs cert, best compatibility)"
 "presetTrojan" = "Trojan + TLS (needs cert)"
 "certHint" = "This preset uses the HTTPS certificate configured in Settings. Fill the domain that matches the certificate, or leave empty to use the current hostname. Pick this when your client cannot use Reality."

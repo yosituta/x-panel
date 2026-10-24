@@ -12,6 +12,8 @@
 | 14 | 首页 5 套主题手动选定 | ✅ | `web/html/index.html`（主题管理器 + 3 套新主题 CSS） |
 | 3 | Reality 随机更换偷用域名 | ✅ | `web/service/reality_domain.go`、`form/reality_settings.html` |
 | 31 | 一键配置 / 批量部署 10 条 VLESS+TCP+Reality+Vision | ✅ | `web/service/batch_deploy.go`、`/panel/api/inbounds/batchDeployReality`、`inbounds.html` 一键配置弹窗 |
+| 33 | 内置订阅转换（V2Ray / Clash / sing-box / Surge） | ✅ | `web/service/subscribe_node.go`、`subscribe_build.go`、`subscribe_render.go`、`web/controller/sub.go`、`GET /sub/:subid` |
+| 34 | 一键配置「自动」预设（有证书走 TLS，否则 Reality） | ✅ | `batch_deploy.go` `PresetAuto`、`inbounds.html`（Reality 系列收进「高级预设」开关） |
 
 ### 第一批实测要点
 
