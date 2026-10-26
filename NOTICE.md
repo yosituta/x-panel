@@ -21,6 +21,15 @@
 - “X-Panel”“X-Panel Pro”为上游作者使用的名称，本项目仅作来源说明之用。
 - 本项目使用独立名称，不自称官方版本、不冒充上游作者、不复用其收费渠道（授权码机器人、授权服务器等）。
 
+## 修改说明（GPLv3 §5a）
+
+本项目对上游代码做了实质性修改，逐项记录在 [`CHANGELOG.md`](CHANGELOG.md)。修改日期：2026-10 起持续维护。
+
+涉及的文件主要是：
+
+- 新增：`web/service/{traffic_reset,reality_domain,batch_deploy,subscribe_*,alert*,backup,presence,report,relay*,panels*,webssh}.go`、`web/controller/{sub,slave,panels}.go`、`web/job/*`、`backup_cmd.go`、`scripts/*`
+- 修改：`main.go`、`web/web.go`、`web/controller/{inbound,server}.go`、`web/service/{inbound,setting,xray,tgbot}.go`、`database/model/model.go`、`web/html/{index,inbounds,settings}.html`、`web/translation/*.toml`、`install.sh`、`x-ui.sh`
+
 ## 免责
 
 本项目为学习与技术研究用途的开源软件。使用者需自行遵守所在国家/地区法律法规，作者不对使用后果承担责任。

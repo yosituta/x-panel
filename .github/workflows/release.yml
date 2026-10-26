@@ -1,0 +1,112 @@
+name: Release
+
+# 打 tag（如 v1.0.0）时自动编译并发布，产物结构要匹配 install.sh 的解包约定：
+#   x-ui/x-ui, x-ui/x-ui.sh, x-ui/bin/xray-linux-<arch>, x-ui/x-ui.service
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '手动发布用的 tag 名（如 v1.0.0）'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            cc: gcc
+            xray_asset: Xray-linux-64.zip
+            xray_bin: xray
+          - arch: arm64
+            cc: aarch64-linux-gnu-gcc
+            xray_asset: Xray-linux-arm64-v8a.zip
+            xray_bin: xray
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+          cache: true
+
+      - name: 安装交叉编译工具链
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential gcc-aarch64-linux-gnu
+
+      - name: 编译面板（CGO_ENABLED=1，sqlite 需要）
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: '1'
+          CC: ${{ matrix.cc }}
+        run: |
+          go build -trimpath -ldflags "-s -w" -o x-ui .
+
+      - name: 下载 Xray-core
+        run: |
+          set -e
+          url=$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+                | grep -oE '"browser_download_url": *"[^"]*${{ matrix.xray_asset }}"' \
+                | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+          echo "xray: $url"
+          curl -fsSL -o xray.zip "$url"
+          unzip -o -q xray.zip xray
+          chmod +x xray
+
+      - name: 打包
+        run: |
+          set -e
+          mkdir -p stage/x-ui/bin
+          cp x-ui stage/x-ui/x-ui
+          cp x-ui.sh stage/x-ui/x-ui.sh
+          cp x-ui.service stage/x-ui/x-ui.service
+          cp xray "stage/x-ui/bin/xray-linux-${{ matrix.arch }}"
+          chmod +x stage/x-ui/x-ui stage/x-ui/x-ui.sh stage/x-ui/bin/xray-linux-${{ matrix.arch }}
+          cd stage && tar -czf "../x-ui-linux-${{ matrix.arch }}.tar.gz" x-ui
+          cd .. && ls -lh x-ui-linux-*.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.arch }}
+          path: x-ui-linux-${{ matrix.arch }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 生成校验和
+        run: cd dist && sha256sum *.tar.gz > sha256sum.txt && cat sha256sum.txt
+
+      - name: 发布
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            dist/*.tar.gz
+            dist/sha256sum.txt
+          generate_release_notes: true
+          body: |
+            安装（把 `<owner>/<repo>` 换成你的仓库）：
+
+            ```bash
+            bash <(curl -Ls https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh)
+            ```
+
+            产物结构：`x-ui/{x-ui, x-ui.sh, x-ui.service, bin/xray-linux-<arch>}`

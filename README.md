@@ -1,77 +1,196 @@
-# 项目 README（开源分支）
+# X-Panel 开源增强版
 
-> 本仓库是 [xeefei/X-Panel](https://github.com/xeefei/X-Panel) 的 **GPLv3 开源分支**，
-> 不是官方版本，也不包含官方“付费 Pro 版”的任何私有代码。
-> 上游 Pro 版以「授权码 + 远程脚本下发」形式分发，源码从不在公开仓库中——
-> 因此本仓库中的增强功能，是依据上游 README 公开的功能描述**独立重新实现**的。
+基于 [xeefei/X-Panel](https://github.com/xeefei/X-Panel) 的 **GPLv3 开源分支**。上游把「一键配置」等实用功能移入付费 Pro 版并停止向免费版更新，本分支按公开功能说明重新实现，并补上了作者自己需要的运维能力。
 
-## 为什么有这个仓库
+- 面板本体：Go + Gin + SQLite，Xray-core 作为子进程托管
+- 一键安装、systemd 托管、单二进制、无外部依赖
+- **不包含**任何上游私有代码；**不实现**授权码/积分/购买机器人等商业闭环
 
-上游把越来越多的功能放进了付费 Pro 版（一键配置、主题切换、流量重置方式、
-批量部署节点等），免费版只剩“购买引导”弹窗。本仓库的目标是：
+> 本仓库与上游作者无隶属关系。上游名称与标识仅用于说明来源与致敬。
 
-1. 用 GPLv3 允许的方式，把这些功能**自己写一遍**，不再依赖授权码；
-2. 保持与上游同步能力，上游更新后可以一条命令拉取并合并；
-3. 全程可编译、可测试、可审计。
+## 功能
 
-## 功能状态
-
-详见 [`docs/ROADMAP.md`](docs/ROADMAP.md)。已实现：
+### 代理与节点
 
 | 功能 | 说明 |
 | --- | --- |
-| 入站周期重置流量 | 每日 / 每周 / 每月 N 号 / 从不；到期自动清零并恢复超量停用的客户端 |
-| 首页 5 套主题 | 标准布局、炫彩动画、深海科技、暮光薰衣、幽林秘境；选定即记住，不再按单双号乱跳 |
-| Reality 随机域名 | 后端并发探测 TLS1.3 存活后随机挑选，避免配到已挂的域名 |
-| 一键配置 / 批量部署 | 一次生成 N 条节点，独立端口/UUID/密钥，自动热加载并给出分享链接；预设含 auto / TLS / Reality / Trojan |
-| 内置订阅转换 | 每个客户端自带 `subId`，`/sub/<subId>` 直接输出 V2Ray / Clash / sing-box / Surge 四种格式，无需第三方 subconverter |
-| 流量与到期告警 | 每 10 分钟扫描，用量达阈值（默认 80%）或到期前 N 天（默认 3）推送到 Telegram 管理员，同一阈值只提醒一次；`POST /panel/api/server/checkAlerts` 可手动触发 |
+| 多协议入站 | VLESS / VMess / Trojan / Shadowsocks，TCP / WS / gRPC / HTTP |
+| 一键批量部署 | 一次生成 N 条节点，独立端口/UUID/密钥，自动热加载并给出链接 |
+| 预设体系 | `auto`（默认）/ TLS / Trojan / Reality（Reality 收在「高级预设」里） |
+| Reality 随机域名 | 并发探测 TLS1.3 存活后再挑，避免配到已死的伪装域名 |
+| 内置订阅转换 | `/sub/<subId>` 直接输出 V2Ray / Clash / sing-box / Surge，无需第三方 subconverter |
+| 一键中转节点 | 本机入口 → 远程 Socks5/HTTP 上游 → 出网，自动写 outbound 与路由规则 |
 
-## 客户端兼容性（实测）
+### 流量与用户管理
 
-部分客户端（实测 iPhone Shadowrocket）无法与 xray 的 Reality 服务端完成握手，服务端日志表现为：
+| 功能 | 说明 |
+| --- | --- |
+| 周期重置流量 | 每日 / 每周 / 每月 N 号 / 从不，短月与闰年已处理 |
+| 流量与到期告警 | 用量达阈值（默认 80%）或到期前 N 天推 Telegram，同阈值只提醒一次 |
+| 节点上下线通知 | 比对 `lastOnline`，状态变化才推送，首次运行只建基线不刷屏 |
+
+### 运维
+
+| 功能 | 说明 |
+| --- | --- |
+| 数据快照 + 急救还原 | `VACUUM INTO` 生成一致性快照；面板崩了也能用 CLI 一条命令还原 |
+| 网页版 SSH | ttyd + basic auth + 复用面板证书走 HTTPS，`x-ui` 菜单 26 |
+| 线路/IP 质量检测 | 出口信息、四大 DNS 延迟丢包、回程路由、带宽粗测，菜单 27 |
+| 地区 DNS 检测 | 8 个国内外 DNS 对比解析，自动提示污染风险，菜单 28 |
+| 深度调优 | BBR + FQ + TFO + 缓冲区，幂等 apply/status/revert，菜单 29 |
+
+### 界与协作
+
+| 功能 | 说明 |
+| --- | --- |
+| 首页 5 套主题 | 标准 / 炫彩 / 深海 / 暮光 / 幽林，选定即记住 |
+| 多面板主从 | 一个面板管理其他面板，被控端 `X-Slave-Key` 鉴权，默认关闭 |
+| 定时报告 | 每天/每周/每月指定时间推送，内容项可勾选，支持预览与立即发送 |
+| Telegram | `/link` 取节点链接、`/panels` `/panel` 管多面板、`/webssh` 查网页终端 |
+
+## 发布到自己的仓库（重要）
+
+本仓库默认仍指向上游地址。**推到你自己的 GitHub 之前，先把 `install.sh` 和 `x-ui.sh` 顶部的这一行改成你的仓库**：
+
+```bash
+X_PANEL_REPO="${X_PANEL_REPO:-你的用户名/仓库名}"
+```
+
+不改的话，一键安装会去拉上游的二进制，装出来没有本分支的功能。改完打 tag 并上传 release 产物（`x-ui-linux-amd64.tar.gz`），安装脚本会自动取最新 release。
+
+发布检查清单：
+
+```bash
+go build ./... && go vet ./... && go test ./...
+bash -n install.sh x-ui.sh scripts/*.sh
+git grep -n "xeefei/x-panel" -- install.sh x-ui.sh   # 确认只剩版权声明
+```
+
+还要确认没有把 `*.db`、证书、`.env`、日志提交进仓库。
+
+## 快速开始
+
+### 一键安装（推荐）
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/<你的用户名>/<仓库名>/main/install.sh)
+```
+
+安装完成后按提示设置端口、路径、账号密码。管理脚本：
+
+```bash
+x-ui            # 打开管理菜单（含证书、备份、调优、网页 SSH 等）
+```
+
+### 手动编译
+
+需要 **Go 1.27+** 与 CGO（sqlite 驱动依赖）：
+
+```bash
+# Linux
+sudo apt install -y build-essential git
+CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o x-ui .
+
+# Windows（需 MinGW-w64 或 zig）
+set CGO_ENABLED=1
+go build -trimpath -ldflags "-s -w" -o x-ui.exe .
+```
+
+1 核 512MB 的小机器不建议本地编译，用 GitHub Actions 或交叉编译更省事：
+
+```bash
+GOOS=linux GOARCH=amd64 CGO_ENABLED=1 \
+  CC="zig cc -target x86_64-linux-gnu" \
+  go build -trimpath -ldflags "-s -w" -o x-ui .
+```
+
+## 首次使用建议
+
+1. **改掉默认端口与访问路径**：`x-ui` → 9 / 7
+2. **配 HTTPS**：`x-ui` → 18（申请证书），或手动填证书路径
+3. **一键配置选「自动」**：有证书且用域名访问时生成 TLS 节点，兼容性最好
+4. **备份先做一次**：设置 → 数据快照 → 立即备份；或 `x-ui backup`
+5. 不用网页 SSH 时记得卸载（`x-ui` → 26 → 卸载）
+
+## 订阅与格式转换
+
+每个客户端自带 16 位 `subId`，一条地址四种格式：
 
 ```
-REALITY: processed invalid connection: authentication failed or validation criteria not met
+https://面板地址/路径/sub/<subId>                 # V2Ray（base64）
+https://面板地址/路径/sub/<subId>?target=clash    # Clash / Mihomo
+https://面板地址/路径/sub/<subId>?target=singbox  # sing-box
+https://面板地址/路径/sub/<subId>?target=surge    # Surge
 ```
 
-此时客户端会收到伪造站点的真实证书后主动断开，表现为"测延迟正常、但打不开网页"。
-已在服务端排除证书、端口、域名、shortId 编码、密钥格式、xray 版本等因素（同一节点用 xray 官方客户端可正常出网）。
+也可用后缀：`.yaml` / `.json` / `.conf`。响应头带 `Subscription-Userinfo`，客户端可直接显示已用流量与到期时间。
 
-**因此一键配置提供 `auto` 预设并作为默认**：面板配置了证书且通过域名访问时自动生成 TLS 节点（兼容性最好），否则退回 Reality。若你的客户端 Reality 不可用，请选 `VLESS + TCP + TLS` 或 `auto`。
+## 命令行
+
+```bash
+x-ui                      # 交互菜单
+x-ui setting -show        # 查看面板设置
+x-ui setting -port 23333  # 改端口
+x-ui backup               # 立即生成数据快照
+x-ui backup -list         # 列出快照
+x-ui backup -restore x-ui-20260101-090000.db.gz   # 还原（面板需停止）
+x-ui -v                   # 版本
+```
 
 ## 与上游同步
 
 ```bash
 git remote add upstream https://github.com/xeefei/X-Panel.git   # 仅首次
-./scripts/sync-upstream.sh --check   # 看有没有新提交
-./scripts/sync-upstream.sh           # 合并上游最新代码
+./scripts/sync-upstream.sh --check   # 看上游有没有新提交
+./scripts/sync-upstream.sh           # 合并上游代码
 ```
 
-## 构建
-
-需要 **Go 1.27+** 与 **CGO**（sqlite 驱动依赖 cgo）：
+合并后必做：
 
 ```bash
-# Linux（Debian/Ubuntu）
-sudo apt install -y build-essential
-CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o x-ui .
-
-# Windows（需 MinGW-w64，Make 可选）
-set CGO_ENABLED=1
-go build -trimpath -ldflags "-s -w" -o x-ui.exe .
+go build ./... && go vet ./... && go test ./...
 ```
 
-> `CGO_ENABLED=0` 能编译通过，但运行时会报
-> `go-sqlite3 requires cgo`，**必须开启 CGO**。
+冲突高发文件：`database/model/model.go`、`web/service/inbound.go`、`web/html/index.html`、`web/html/inbounds.html`、`web/translation/*.toml`。
 
-## 测试
+## 开发与测试
 
 ```bash
-go vet ./...        # 已修复上游遗留的两处 vet 告警，现在全绿
-go test ./...
+go test ./web ./web/service -run Test      # 单元测试
+bash scripts/e2e-smoke.sh                  # 端到端冒烟（需可运行的面板）
+bash scripts/deploy-vps.sh                 # 部署到 VPS
 ```
 
-## 许可
+覆盖：周期重置时间逻辑、节点与订阅四种格式渲染、告警阈值、上下线判定、快照压缩与 SQLite 头校验、模板解析。
 
-GPL-3.0，见 `LICENSE` 与 `NOTICE.md`。再分发时必须同样以 GPLv3 提供源码并保留上游版权声明。
+## 目录结构
+
+```
+main.go              入口（run / setting / migrate / backup）
+web/                 面板：controller、service、html 模板、assets
+xray/                Xray 进程与 gRPC API 封装
+database/            SQLite 模型与 DAO
+config/              配置项
+scripts/             运维脚本（调优、DNS、线路、ttyd、e2e、部署、同步）
+docs/                路线图、上游 README、分析笔记
+```
+
+## 常见问题
+
+**Reality 节点测延迟正常但打不开网页？**
+服务端日志若出现 `REALITY: authentication failed`，是客户端 Reality 实现与服务端不兼容（实测部分 Shadowrocket 版本如此）。换 `自动` 或 `TLS` 预设即可，不属于服务端配置问题。
+
+**订阅里的地址是 127.0.0.1？**
+地址取值顺序：订阅域名 → 面板证书目录名 → 机器名。在设置里填「订阅域名」，或访问面板时用域名而非 IP。
+
+**一键中转节点创建后连不上？**
+先确认上游 Socks5/HTTP 本身可用；再看 `xray` 日志里有没有 `failed to dial`。删除用 `POST /panel/api/inbounds/relay/remove/<端口>`，会同步清理 outbound 与路由。
+
+**大文件上传到 VPS 老是断？**
+分片上传（`split -b 2M`）+ 逐片校验，或直接在服务器上编译。
+
+## 致谢与许可
+
+- 面板骨架来自 [xeefei/X-Panel](https://github.com/xeefei/X-Panel)（GPLv3）与 [XTLS/Xray-core](https://github.com/XTLS/Xray-core)
+- 本分支同样以 **GPLv3** 发布，详见 [LICENSE](LICENSE) 与 [NOTICE.md](NOTICE.md)
+- 按 GPLv3 要求：二次分发需保留版权声明与许可，并标明修改内容（见 [CHANGELOG.md](CHANGELOG.md)）
