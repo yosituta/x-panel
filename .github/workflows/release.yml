@@ -59,8 +59,9 @@ jobs:
                 | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
           echo "xray: $url"
           curl -fsSL -o xray.zip "$url"
-          unzip -o -q xray.zip xray
-          chmod +x xray
+          mkdir -p xraydl
+          unzip -o -q xray.zip -d xraydl
+          chmod +x xraydl/xray
 
       - name: 打包
         run: |
@@ -69,7 +70,7 @@ jobs:
           cp x-ui stage/x-ui/x-ui
           cp x-ui.sh stage/x-ui/x-ui.sh
           cp x-ui.service stage/x-ui/x-ui.service
-          cp xray "stage/x-ui/bin/xray-linux-${{ matrix.arch }}"
+          cp xraydl/xray "stage/x-ui/bin/xray-linux-${{ matrix.arch }}"
           chmod +x stage/x-ui/x-ui stage/x-ui/x-ui.sh stage/x-ui/bin/xray-linux-${{ matrix.arch }}
           cd stage && tar -czf "../x-ui-linux-${{ matrix.arch }}.tar.gz" x-ui
           cd .. && ls -lh x-ui-linux-*.tar.gz
