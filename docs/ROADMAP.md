@@ -19,6 +19,11 @@
 | 37 | TG 获取节点链接（#19） | ✅ | `tgbot.go` `/link [关键字]`、`subscribe_all.go`、`GET /panel/api/server/nodeLinks` |
 | 38 | 网页版 SSH / ttyd（#7、#10、#12） | ✅ | `scripts/ttyd.sh`、`x-ui.sh` 菜单 26、TG `/webssh` |
 | 39 | 多面板主从（#18） | ✅ | `web/controller/slave.go`、`panels.go`、`web/service/panels*.go`、设置页「多面板」、TG `/panels` `/panel` |
+| 40 | 线路/IP 质量检测（#8） | ✅ | `scripts/linecheck.sh`、`x-ui.sh` 菜单 27 |
+| 41 | 地区 DNS 检测（#9） | ✅ | `scripts/dnscheck.sh`、菜单 28 |
+| 42 | 深度调优 BBR/FQ/TFO（#23） | ✅ | `scripts/tune.sh`、菜单 29 |
+| 43 | TG 定时报告可定制（#16） | ✅ | `web/service/report.go`、`web/job/report_job.go`、设置页「定时报告」 |
+| 44 | 一键中转节点（#20） | ✅ | `web/service/relay*.go`、`POST /panel/api/inbounds/relay`、入站页弹窗 |
 
 ### 第一批实测要点
 
