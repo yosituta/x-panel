@@ -18,6 +18,7 @@
 | 36 | 节点上/下线 TG 通知（#25） | ✅ | `web/service/presence.go`、`web/job/presence_job.go`、`POST /panel/api/server/checkPresence` |
 | 37 | TG 获取节点链接（#19） | ✅ | `tgbot.go` `/link [关键字]`、`subscribe_all.go`、`GET /panel/api/server/nodeLinks` |
 | 38 | 网页版 SSH / ttyd（#7、#10、#12） | ✅ | `scripts/ttyd.sh`、`x-ui.sh` 菜单 26、TG `/webssh` |
+| 39 | 多面板主从（#18） | ✅ | `web/controller/slave.go`、`panels.go`、`web/service/panels*.go`、设置页「多面板」、TG `/panels` `/panel` |
 
 ### 第一批实测要点
 
