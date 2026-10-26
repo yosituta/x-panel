@@ -8,6 +8,24 @@
 
 ---
 
+## 新增两个预设，一键配置扩到四个选项（2026-10-26）
+
+与上游 `vless_reality / vless_xhttp_reality / vless_tls_encryption / switch_vision_seed_dev` 对齐：
+
+| 序号 | 预设 | 说明 |
+| --- | --- | --- |
+| 1 | VLESS + TCP + Reality + Vision | 无需域名证书 |
+| 2 | VLESS + XHTTP + Reality | 无需证书，路径与模式随机，抗封锁更强 |
+| 3 | VLESS Encryption + XHTTP + TLS | 可选套 CDN，需面板已配置证书 |
+| 4 | Switch + Vision Seed | 置灰，标注「开发中」 |
+
+实现要点：
+
+- 预设 2 的 `xhttpSettings` 与上游一致（`mode: packet-up`、`scMaxEachPostBytes: 1000000`、`xPaddingBytes: 100-1000` 等），路径随机 8 位
+- 预设 3 的密钥对与 `xray vlessenc` 的 X25519 组等价：服务端 `mlkem768x25519plus.native.600s.<私钥>`，客户端 `mlkem768x25519plus.native.0rtt.<公钥>`
+- **踩坑**：VLESS 加密（`decryption` 非 `none`）与 `fallbacks` 互斥，同时出现会让 xray 直接拒绝启动，生成时必须省略 `fallbacks`
+- 两个新预设均已在 Xray 25.9.11 上用 `xray -test` 校验，并从独立客户端实际出网验证
+
 ## 一键配置简化 + 固定 Xray 内核（2026-10-26）
 
 ### 根因：REALITY 从 Xray 26.7 起改用后量子混合密钥交换

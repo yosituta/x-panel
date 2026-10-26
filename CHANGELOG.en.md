@@ -8,6 +8,24 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Two more presets — one-click setup now offers four options (2026-10-26)
+
+Aligned with upstream `vless_reality / vless_xhttp_reality / vless_tls_encryption / switch_vision_seed_dev`:
+
+| # | Preset | Notes |
+| --- | --- | --- |
+| 1 | VLESS + TCP + Reality + Vision | no domain or certificate needed |
+| 2 | VLESS + XHTTP + Reality | no certificate, random path and mode, harder to block |
+| 3 | VLESS Encryption + XHTTP + TLS | CDN-friendly, requires a certificate in the panel |
+| 4 | Switch + Vision Seed | disabled, marked "in development" |
+
+Implementation notes:
+
+- Preset 2 uses the same `xhttpSettings` as upstream (`mode: packet-up`, `scMaxEachPostBytes: 1000000`, `xPaddingBytes: 100-1000`), with a random 8-character path
+- Preset 3 generates a key pair equivalent to `xray vlessenc`'s X25519 output: server `mlkem768x25519plus.native.600s.<private>`, client `mlkem768x25519plus.native.0rtt.<public>`
+- **Pitfall**: VLESS encryption (`decryption` other than `none`) is mutually exclusive with `fallbacks`; having both makes Xray refuse to start, so `fallbacks` must be omitted
+- Both presets were validated with `xray -test` on Xray 25.9.11 and exercised end-to-end from a separate client
+
 ## Simpler one-click setup + pinned Xray core (2026-10-26)
 
 ### Root cause: REALITY switched to a post-quantum hybrid key exchange in Xray 26.7
