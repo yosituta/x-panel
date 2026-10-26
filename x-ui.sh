@@ -1582,119 +1582,21 @@ warp_cloudflare() {
     esac
 }
 
-# --------- 【订阅转换】模块 ---------- 
+# --------- 订阅转换（面板内置，无需第三方服务） ----------
 subconverter() {
 echo ""
-echo -e "${green}==============================================="
-echo -e "〔订阅转换〕一键部署"
-echo -e "1. 自动安装/部署 Nginx"
-echo -e "2. 自动调用面板的证书"
-echo -e "3. 自动部署 Sublink 服务"
-echo -e "4. 自动配置 Nginx 反向代理"
-echo -e "5. 可直观在前端页面配置订阅"
-echo -e "作者：〔X-Panel 面板〕专属定制"
+echo -e "${green}===============================================${plain}"
+echo -e "订阅转换已内置，无需再安装 Sublink / Nginx"
 echo -e "===============================================${plain}"
 echo ""
-    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
-
-    if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
-    echo -e "${green}面板已安装证书采用SSL保护${plain}"
-    echo ""
-    domain=$(basename "$(dirname "$existing_cert")")
-    echo -e "${green}------------->>>>接下来进行sublink订阅转换服务的安装  ........${plain}"
-    sleep 3
-    echo ""
-else
-    echo -e "${red}警告：未找到证书和密钥，面板不安全！${plain}"
-    echo ""
-    echo -e "${green}------->>>>且不能安装sublink订阅转换服务<<<<-------${plain}"
-    echo ""
-    sleep 5
-    exit 1
-fi
-
-# --------- 安装/部署sublink服务 ----------
-
-bash <(curl -Ls https://raw.githubusercontent.com/xeefei/sublink/main/install.sh)
-
-
-# --------- 安装 Nginx ----------
-if ! command -v nginx &>/dev/null; then
-    echo -e "${yellow}-------------->>>>>>>>未检测到 Nginx，正在安装...${plain}"
-    apt update && apt install -y nginx
-    systemctl enable nginx
-    systemctl start nginx
-else
-    echo -e "${green}检测到 Nginx 已安装，跳过安装步骤${plain}"
-fi
-
-# --------- 拷贝X-Panel已有证书到 Nginx ----------
-mkdir -p /etc/nginx/ssl
-acme_path="/root/.acme.sh/${domain}_ecc"
-
-cp "${acme_path}/fullchain.cer" "/etc/nginx/ssl/${domain}.cer"
-cp "${acme_path}/${domain}.key" "/etc/nginx/ssl/${domain}.key"
-
-
-# --------- 配置 Nginx 反向代理 ----------
-NGINX_CONF="/etc/nginx/conf.d/sublink.conf"
-cat > $NGINX_CONF <<EOF
-server {
-    listen 15268 ssl http2;
-    server_name ${domain};
-
-    # 证书路径（从 acme.sh 复制到 /etc/nginx/ssl/ 下）
-    ssl_certificate     /etc/nginx/ssl/${domain}.cer;
-    ssl_certificate_key /etc/nginx/ssl/${domain}.key;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-}
-EOF
-
-# 重载 nginx，让新证书生效
-sleep 1
-systemctl reload nginx
-sleep 2
-
-# --------- 使用 sed 替换 ExecStart 行，添加启动参数 ----------
-sudo sed -i "/^ExecStart=/ s|$| run --port 8000|" "/etc/systemd/system/sublink.service"
-# 重新加载 systemd 守护进程
-sudo systemctl daemon-reload
-# 重启 sublink 服务
-sudo systemctl restart sublink
-
-
-# --------- 开放防火墙端口 ----------
+echo -e "每个客户端都带一个 16 位 subId，直接在浏览器或客户端填："
+echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>${plain}                 # V2Ray"
+echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=clash${plain}    # Clash"
+echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=singbox${plain}  # sing-box"
+echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=surge${plain}    # Surge"
 echo ""
-echo -e "${yellow}请务必手动放行${plain}${red} 8000 和 15268 ${yellow}端口！！${plain}"
+echo -e "在面板【入站】页面 → 右上角菜单 → 导出-订阅设置，可直接拿到完整链接。"
 echo ""
-
-# --------- 完成提示 ----------
-echo ""
-echo -e "${green}【订阅转换模块】安装完成！！！${plain}"
-echo ""
-echo -e "${green}登录用户名：admin，密码：123456，请进后台自行修改${plain}"
-echo ""
-echo -e "${green}Web 界面访问地址：https://${domain}:15268${plain}"
-echo ""
-echo -e "${green}若要登录前端网页使用【订阅转换】，请直接复制以上地址${plain}"
-echo ""
-echo -e "${green}接下来流程会进入〔X-Panel面板〕x-ui 菜单项${plain}"
-sleep 8
-echo ""
-# --------- 返回菜单 ----------
-show_menu
 }
 
 run_speedtest() {
@@ -2150,39 +2052,14 @@ show_menu() {
   ${green}28.${plain} 地区 DNS 检测
   ${green}29.${plain} 深度调优（BBR/FQ/TFO）
 ——————————————————————
-  ${green}若在使用过程中有任何问题${plain}
-  ${yellow}请加入〔X-Panel面板〕交流群${plain}
-  ${red}https://t.me/XUI_CN ${yellow}截图进行反馈${plain}
-  ${green}〔X-Panel面板〕项目地址${plain}
+  ${green}项目地址${plain}
   ${yellow}https://github.com/yosituta/x-panel${plain}
-  ${green}详细〔安装配置〕教程${plain}
-  ${yellow}https://xeefei.blogspot.com/2025/09/x-panel.html${plain}
 ——————————————————————
-
--------------->>>>>>>赞 助 推 广 区<<<<<<<<-------------------
-
-${green}1、搬瓦工GIA高端线路：${yellow}https://bandwagonhost.com/aff.php?aff=75015${plain}
-
-${green}2、Dmit高端GIA线路：${yellow}https://www.dmit.io/aff.php?aff=9326${plain}
-
-${green}3、Gomami亚太顶尖优化线路：${yellow}https://gomami.io/aff.php?aff=174${plain}
-
-${green}4、ISIF优质亚太优化线路：${yellow}https://cloud.isif.net/login?affiliation_code=333${plain}
-
-${green}5、ZoroCloud全球优质原生家宽&住宅双lSP，跨境首选：${yellow}https://my.zorocloud.com/aff.php?aff=1072${plain}
-
-${green}6、三网直连 IEPL / IPLC 直播流量转发：${yellow}https://idc333.top/#register/BCUZXNELNO${plain}
-
-${green}7、Bagevm优质落地鸡（原生IP全解锁）：${yellow}https://www.bagevm.com/aff.php?aff=754${plain}
-
-${green}8、白丝云〔4837线路〕实惠量大管饱：${yellow}https://cloudsilk.io/aff.php?aff=706${plain}
-
-${green}9、RackNerd极致性价比机器：${yellow}https://my.racknerd.com/aff.php?aff=15268&pid=912${plain}
 
 ----------------------------------------------
 "
     show_status
-    echo && read -p "请输入选项 [0-25]: " num
+    echo && read -p "请输入选项 [0-29]: " num
 
     case "${num}" in
     0)

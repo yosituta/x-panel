@@ -448,28 +448,8 @@
                     content: h('div', { style: 'margin-top: 10px; font-size: 15px; line-height: 1.6;' }, [ // 增加行高，提升阅读体验
                         
                         // 第一段：设置底部外边距，模拟空行
-                        h('p', { style: 'margin-bottom: 15px;' }, '此项功能是“付费Pro版”专属功能，免费版不能用，'), 
-                        
-                        // 第二段：设置底部外边距，模拟空行
-                        h('p', { style: 'margin-bottom: 15px;' }, '请联系面板管理员〔购买授权码〕之后才能继续使用。'), 
-                        
-                        // 第三段：TG 链接（无需底部外边距）
-                        h('p', { style: 'color: #ff4d4f; font-weight: bold; margin-bottom: 0;' }, [
-                            '----->>> “授权码购买”机器人：',
-                            h('a', { 
-                                // 设置跳转链接到 Telegram
-                                attrs: { 
-                                    href: 'https://t.me/Buy_ShouQuan_Bot', 
-                                    target: '_blank' // 在新标签页打开
-                                }, 
-                                style: { 
-                                    color: '#1890ff', // 链接颜色
-                                    fontWeight: 'bold',
-                                    textDecoration: 'underline' // 链接下划线
-                                } 
-                            }, '@Buy_ShouQuan_Bot')
-                        ]),
-                    ]),
+                                                // 多面板管理已在【设置 → 多面板】中实现
+h('p', { style: 'margin-bottom: 0;' }, '被控端管理请前往【设置 → 多面板】：填入被控端的地址与密钥即可纳管。'),                    ]),
                     onOk() {}
                 });
             },

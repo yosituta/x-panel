@@ -89,3 +89,19 @@ web/web.go                         新增定时任务与订阅/被控端路由
 ```bash
 go build ./... && go vet ./... && go test ./...
 ```
+
+## 清理上游痕迹与推广内容（2026-10-26）
+
+移除上游遗留的品牌推广、返利广告与数据上报，使本分支成为独立品牌的产品：
+
+| 位置 | 移除内容 |
+| --- | --- |
+| `x-ui.sh` | 菜单尾部 9 条 VPS 返利广告、Telegram 交流群、上游博客教程链接 |
+| `install.sh` | 安装完成提示中的同类广告与群链接 |
+| `web/html/index.html` | 上游 releases 链接、TG 私聊机器人标签、TG 交流群标签 |
+| `web/html/navigation.html` | 「交流群与安装教程」「推广赞助」「Pro 介绍」「授权码事宜」四个板块整体删除；保留实用技巧与代理软件说明 |
+| `web/html/servers.html` | 「付费 Pro 版专属 / 购买授权码」弹窗改为指向本分支真实实现的【设置 → 多面板】 |
+| `web/service/tgbot.go` | TG 菜单的「VPS 推荐」返利广告；中奖上报上游频道（`REPORT_BOT_TOKEN` / `REPORT_CHAT_IDS`，会把用户名、TG ID、主机名发往第三方）；抽奖文案里的上游品牌与交流群 |
+| `x-ui.sh` 菜单 25 | 不再安装第三方 Sublink + Nginx，改为提示面板内置的 `/sub/<subId>` 订阅 |
+
+NOTICE 同步精简为最小署名版本：仅声明 GPLv3 衍生关系与修改说明，不再包含任何商业或社区信息。

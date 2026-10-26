@@ -1811,13 +1811,13 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		messageId := callbackQuery.Message.GetMessageID() // 获取原消息 ID
 		
 		// 〔中文注释〕: 首先，回应 TG 的回调请求，告诉用户机器人已收到操作。
-		t.sendCallbackAnswerTgBot(callbackQuery.ID, "〔X-Panel 小白哥〕正在为您摇奖，请稍后......")
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, "本面板正在为您摇奖，请稍后......")
 		
 		// 这条消息会永久停留在聊天窗口，作为等待提示。
 		t.editMessageTgBot(
 			chatId,
 			messageId,
-			"⏳ **抽奖结果生成中...**\n\n------->>>请耐心等待 5 秒......\n\n〔X-Panel 小白哥〕马上为您揭晓！",
+			"⏳ **抽奖结果生成中...**\n\n------->>>请耐心等待 5 秒......\n\n本面板马上为您揭晓！",
 			// 【关键】: 不传入键盘参数，自动移除旧键盘
 		)
 
@@ -1907,54 +1907,8 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				            "**中奖时间**: " + winningTime + "\n\n" +
 				            "**防伪码 (Hash)**: `" + validationHash + "`\n\n" +
 							"**兑奖说明**：请截图此完整消息，\n\n" +
-							"并联系交流群内管理员进行兑奖。\n\n" +
-							"------------->>>>〔X-Panel 面板〕交流群：\n\n" +
-							"------------->>>> https://t.me/XUI_CN"
+							"并联系面板管理员进行兑奖。"
 
-			// --- 【向中央统计频道发送报告（异步）】 ---
-			go func() {
-				// 尝试获取主机名作为唯一标识
-				vpsIdentifier, err := os.Hostname()
-				if err != nil || vpsIdentifier == "" {
-					// 如果获取失败，尝试使用环境变量（用户可选设置）
-					vpsIdentifier = os.Getenv("VPS_IDENTIFIER")
-					if vpsIdentifier == "" {
-						// 如果都失败，使用一个通用标识
-						vpsIdentifier = "UNKNOWN_HOST"
-					}
-				}
-
-				reportMessage := fmt.Sprintf(
-					"✅ **[中奖报告 - %s]**\n\n" +
-					"**用户名**: `%s`\n\n" +
-					"**用户ID**: `%d`\n\n" +
-					"**中奖时间**: %s\n\n" + 
-					"**部署来源**: `%s`", // 自动获取的主机名
-					prize,
-					userInfo,
-					userID,
-					winningTime,
-					vpsIdentifier,
-				)
-				// --- 【核心】: 创建一个临时的、专用于报告的机器人实例 ---
-		        reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
-		        if err != nil {
-			        logger.Errorf("无法创建报告机器人实例: %v", err)
-			        return // 如果无法创建报告机器人，则静默失败，不影响用户
-		        }
-
-				// --- 遍历所有报告频道 ID 并发送 ---
-				for _, chatID := range REPORT_CHAT_IDS {
-					// 构建正确的 SendMessageParams
-					params := tu.Message(tu.ID(chatID), reportMessage).WithParseMode(telego.ModeMarkdown)
-
-					// 使用临时机器人的 SendMessage 方法发送报告
-					_, err = reportBot.SendMessage(context.Background(), params)
-					if err != nil {
-						logger.Warningf("发送【中奖报告】到频道 %d 失败: %v", chatID, err)
-					}
-				}	
-	        }() // 异步执行结束
 					
 			// 〔中文注释〕: 记录中奖结果 (调用在 database 中实现的函数)。
 			err := database.RecordUserWin(userID, prize)
@@ -1969,48 +1923,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				// 〔中文注释〕: 如果未中奖或抽奖出错，则直接显示相应信息。
 				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), resultMessage)
 
-				// --- 【新增：未中奖也发送报告到中央频道（异步）】 ---
-				go func() {
-					// 尝试获取主机名作为唯一标识
-					vpsIdentifier, err := os.Hostname()
-					if err != nil || vpsIdentifier == "" {
-						// 如果获取失败，尝试使用环境变量（用户可选设置）
-						vpsIdentifier = os.Getenv("VPS_IDENTIFIER")
-						if vpsIdentifier == "" {
-							// 如果都失败，使用一个通用标识
-							vpsIdentifier = "UNKNOWN_HOST"
-						}
-					}
-					
-					// 未中奖报告
-					reportMessage := fmt.Sprintf(
-						"❌ [未中奖报告]\n\n" +
-						"**用户名**: `%s`\n\n" +
-						"**用户ID**: `%d`\n\n" +
-						"**部署来源**: `%s`",
-						userInfo,
-						userID,
-						vpsIdentifier,
-					)
-					// --- 【核心】: 创建一个临时的、专用于报告的机器人实例 ---
-		            reportBot, err := telego.NewBot(REPORT_BOT_TOKEN)
-		            if err != nil {
-			            logger.Errorf("无法创建报告机器人实例: %v", err)
-			            return // 如果无法创建报告机器人，则静默失败，不影响用户
-		            }
-
-				    // --- 遍历所有报告频道 ID 并发送 ---
-					for _, chatID := range REPORT_CHAT_IDS {
-						// 构建正确的 SendMessageParams
-						params := tu.Message(tu.ID(chatID), reportMessage).WithParseMode(telego.ModeMarkdown)
-
-						// 使用临时机器人的 SendMessage 方法发送报告
-						_, err = reportBot.SendMessage(context.Background(), params)
-						if err != nil {
-							logger.Warningf("发送【未中奖报告】到频道 %d 失败: %v", chatID, err)
-						}
-					}	
-	           }() // 异步执行结束
 			}
 			return // 〔中文注释〕: 处理完毕，直接返回，避免执行后续逻辑。
 
@@ -2095,48 +2007,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		// 〔中文注释〕: 直接调用您代码中已有的 sendLotteryGameInvitation 函数即可
 		t.sendLotteryGameInvitation()
 
-	case "vps_recommend":
-		// 〔中文注释〕: 发送您指定的VPS推荐信息
-		t.deleteMessageTgBot(chatId, callbackQuery.Message.GetMessageID())
-		t.sendCallbackAnswerTgBot(callbackQuery.ID, "请查看VPS推荐列表")
-		vpsMessage := `✰若需要购买VPS，以下可供选择（包含AFF）✰
-
-1、搬瓦工GIA高端线路，仅推荐购买GIA套餐：
-https://bandwagonhost.com/aff.php?aff=75015
-
-2、Dmit高端GIA线路：
-https://www.dmit.io/aff.php?aff=9326
-
-3、Gomami亚太顶尖优化线路：
-https://gomami.io/aff.php?aff=174
-
-4、ISIF优质亚太优化线路：
-https://cloud.isif.net/login?affiliation_code=333
-
-5、ZoroCloud全球优质原生家宽&住宅双lSP，跨境首选：
-https://my.zorocloud.com/aff.php?aff=1072
-
-6、三网直连 IEPL / IPLC 直播流量转发：
-https://idc333.top/#register/BCUZXNELNO
-
-7、Bagevm优质落地鸡（原生IP全解锁）：
-https://www.bagevm.com/aff.php?aff=754
-
-8、白丝云【4837线路】实惠量大管饱：
-https://cloudsilk.io/aff.php?aff=706
-
-9、RackNerd极致性价比机器：
-https://my.racknerd.com/aff.php?aff=15268&pid=912`
-		// 〔中文注释〕: 发送消息时禁用链接预览，使界面更整洁
-		params := tu.Message(
-			tu.ID(chatId),
-			vpsMessage,
-		).WithLinkPreviewOptions(&telego.LinkPreviewOptions{IsDisabled: true})
-
-		_, err := bot.SendMessage(context.Background(), params)
-		if err != nil {
-			logger.Warning("发送VPS推荐消息失败:", err)
-		}	
 	}
 }
 
@@ -2332,7 +2202,6 @@ func (t *Tgbot) SendAnswer(chatId int64, msg string, isAdmin bool) {
 		// 〔中文注释〕: 【新增功能行】 - 添加娱乐抽奖和VPS推荐按钮
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("🎁 娱乐抽奖").WithCallbackData(t.encodeQuery("lottery_play_menu")),
-			tu.InlineKeyboardButton("🛰️ VPS 推荐").WithCallbackData(t.encodeQuery("vps_recommend")),
 		),
 		// TODOOOOOOOOOOOOOO: Add restart button here.
 	)

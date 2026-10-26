@@ -89,3 +89,19 @@ Always re-verify after a merge:
 ```bash
 go build ./... && go vet ./... && go test ./...
 ```
+
+## Upstream traces and promotional content removed (2026-10-26)
+
+The fork no longer carries the upstream project's branding, affiliate advertising, or telemetry:
+
+| Location | Removed |
+| --- | --- |
+| `x-ui.sh` | nine VPS affiliate links in the menu footer, the Telegram group, and the upstream blog tutorial link |
+| `install.sh` | the same advertising and group links in the completion message |
+| `web/html/index.html` | upstream releases link, Telegram bot tag, Telegram group tag |
+| `web/html/navigation.html` | the four tabs "community & install guide", "sponsorship", "Pro introduction" and "license keys"; the practical tips and client guides remain |
+| `web/html/servers.html` | the "paid Pro only / buy a license key" dialog now points at this fork's real multi-panel feature under Settings |
+| `web/service/tgbot.go` | the "VPS recommendations" affiliate entry in the bot menu; the win-reporting to upstream channels (`REPORT_BOT_TOKEN` / `REPORT_CHAT_IDS`, which sent usernames, Telegram IDs and hostnames to a third party); upstream branding in the lottery text |
+| `x-ui.sh` menu 25 | no longer installs third-party Sublink + Nginx; it explains the built-in `/sub/<subId>` endpoint instead |
+
+NOTICE was reduced to the minimum attribution required by GPLv3: the derivative-work statement and a pointer to the modification log.

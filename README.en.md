@@ -194,5 +194,5 @@ Chunked upload (`split -b 2M`) with per-chunk verification, or build directly on
 ## Credits & license
 
 - Panel skeleton from [xeefei/X-Panel](https://github.com/xeefei/X-Panel) (GPLv3) and [XTLS/Xray-core](https://github.com/XTLS/Xray-core)
-- This fork is released under **GPLv3** as well — see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md)
+- This fork is released under **GPLv3** as well — see [LICENSE](LICENSE) and [NOTICE.en.md](NOTICE.en.md)
 - Per GPLv3: redistributions must keep the copyright notices and license, and state the changes made (see [CHANGELOG.en.md](CHANGELOG.en.md))
