@@ -363,9 +363,12 @@
 
 "pickTip" = "Pick a protocol — one click generates a ready-to-use inbound (port assigned automatically)"
 "opt1Desc" = "Recommended · no domain or certificate needed"
-"opt2Desc" = "Needs a certificate configured in the panel · best compatibility"
-"opt3Desc" = "Needs a certificate configured in the panel · good as a fallback"
+"opt2Desc" = "No certificate · harder to block · needs a recent client"
+"opt3Desc" = "Needs a certificate · can sit behind a CDN"
 "advancedOptions" = "Advanced (count / port / remark / traffic / camouflage domain)"
+"opt4Desc" = "In development"
+"presetXHTTPReality" = "VLESS + XHTTP + Reality"
+"presetTLSEncryption" = "VLESS Encryption + XHTTP + TLS (CDN optional)"
 [pages.inbounds.oneClick.preset]
 "vless_reality" = "VLESS + TCP + Reality + Vision"
 "vless_xhttp_reality" = "VLESS + XHTTP + Reality"

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -40,6 +41,9 @@ const (
 	PresetRealityLegacy   = "reality-legacy" // 完全复刻上游旧版“一键配置”的写法
 	PresetTLS             = "tls"
 	PresetTrojan          = "trojan"
+	// 【一键配置】与上游对齐的另外两种预设
+	PresetXHTTPReality  = "xhttp-reality"  // VLESS + XHTTP + Reality（无需证书，抗封锁更强）
+	PresetTLSEncryption = "tls-encryption" // VLESS 加密 + XHTTP + TLS（可套 CDN）
 
 	DefaultBatchCount   = 10
 	DefaultBatchPrefix  = "reality"
@@ -77,6 +81,9 @@ type DeployedInbound struct {
 	PublicKey  string `json:"publicKey,omitempty"`
 	ShortId    string `json:"shortId,omitempty"`
 	ServerName string `json:"serverName,omitempty"`
+	Path       string `json:"path,omitempty"`       // XHTTP 路径
+	Mode       string `json:"mode,omitempty"`       // XHTTP 模式
+	Encryption string `json:"encryption,omitempty"` // VLESS Encryption 客户端串
 	Link       string `json:"link"`
 }
 
@@ -131,6 +138,48 @@ func genPassword(n int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+// genXhttpPath 生成形如 /Ab3dE9kl 的 XHTTP 路径
+func genXhttpPath() (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	for i := range buf {
+		buf[i] = charset[int(buf[i])%len(charset)]
+	}
+	return "/" + string(buf), nil
+}
+
+// genVlessEncryption 生成 VLESS 加密的 (服务端 decryption, 客户端 encryption) 配对，
+// 与 `xray vlessenc` 的 X25519 组输出等价：
+//
+//	decryption = mlkem768x25519plus.native.600s.<私钥>
+//	encryption = mlkem768x25519plus.native.0rtt.<公钥>
+func genVlessEncryption() (decryption, encryption string, err error) {
+	priv, pub, err := genX25519()
+	if err != nil {
+		return "", "", err
+	}
+	return "mlkem768x25519plus.native.600s." + priv,
+		"mlkem768x25519plus.native.0rtt." + pub, nil
+}
+
+// defaultXhttpSettings XHTTP 入站参数，与上游旧版一键配置保持一致
+func defaultXhttpSettings(path, mode string) map[string]any {
+	return map[string]any{
+		"host":                 "",
+		"path":                 path,
+		"mode":                 mode,
+		"headers":              map[string]any{},
+		"noSSEHeader":          false,
+		"scMaxBufferedPosts":   30,
+		"scMaxEachPostBytes":   "1000000",
+		"scStreamUpServerSecs": "20-80",
+		"xPaddingBytes":        "100-1000",
+	}
 }
 
 func portAvailable(port int) bool {
@@ -363,6 +412,83 @@ func buildInbound(o *BatchDeployOptions, port int, domain, remark string, creds 
 		deployed.Password = password
 		deployed.ServerName = creds.ServerName
 
+	case PresetXHTTPReality, PresetTLSEncryption:
+		clientUUID := uuid.NewString()
+		path, err := genXhttpPath()
+		if err != nil {
+			return nil, nil, err
+		}
+		const xhttpMode = "packet-up"
+		inbound.Protocol = model.VLESS
+		stream := map[string]any{
+			"network":       "xhttp",
+			"xhttpSettings": defaultXhttpSettings(path, xhttpMode),
+		}
+
+		if preset == PresetXHTTPReality {
+			privateKey, publicKey, err := genX25519()
+			if err != nil {
+				return nil, nil, err
+			}
+			shortId, err := genShortId()
+			if err != nil {
+				return nil, nil, err
+			}
+			inbound.Settings = mustJSON(map[string]any{
+				"clients":    []map[string]any{newVlessClient(clientUUID, email, "", totalBytes, o.ExpiryTime, now)},
+				"decryption": "none",
+				"fallbacks":  []any{},
+			})
+			stream["security"] = "reality"
+			stream["realitySettings"] = map[string]any{
+				"show":        false,
+				"xver":        0,
+				"target":      net.JoinHostPort(domain, "443"),
+				"serverNames": []string{domain, "www." + domain},
+				"privateKey":  privateKey,
+				"shortIds":    []string{shortId},
+				"settings": map[string]any{
+					"publicKey": publicKey, "fingerprint": o.Fingerprint, "serverName": "", "spiderX": "/",
+				},
+			}
+			deployed.PublicKey = publicKey
+			deployed.ShortId = shortId
+			deployed.ServerName = domain
+		} else {
+			if creds == nil || creds.CertFile == "" || creds.KeyFile == "" {
+				return nil, nil, fmt.Errorf("该预设需要在面板【设置】里配置证书（webCertFile / webKeyFile）")
+			}
+			decryption, encryption, err := genVlessEncryption()
+			if err != nil {
+				return nil, nil, err
+			}
+			// 注意：VLESS 加密与 fallbacks 互斥，同时出现会导致 xray 拒绝启动
+			inbound.Settings = mustJSON(map[string]any{
+				"clients":    []map[string]any{newVlessClient(clientUUID, email, "", totalBytes, o.ExpiryTime, now)},
+				"decryption": decryption,
+				"encryption": encryption,
+			})
+			stream["security"] = "tls"
+			stream["tlsSettings"] = map[string]any{
+				"serverName": creds.ServerName,
+				"alpn":       []string{"h2", "http/1.1"},
+				"certificates": []map[string]any{{
+					"certificateFile": creds.CertFile,
+					"keyFile":         creds.KeyFile,
+				}},
+			}
+			deployed.Encryption = encryption
+			deployed.ServerName = creds.ServerName
+		}
+
+		inbound.StreamSettings = mustJSON(stream)
+		sniff := defaultSniffing()
+		sniff["enabled"] = true
+		inbound.Sniffing = mustJSON(sniff)
+		deployed.UUID = clientUUID
+		deployed.Path = path
+		deployed.Mode = xhttpMode
+
 	default:
 		return nil, nil, fmt.Errorf("未知预设: %s", preset)
 	}
@@ -408,6 +534,18 @@ func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 		return fmt.Sprintf(
 			"trojan://%s@%s:%d?security=tls&sni=%s&fp=%s#%s",
 			d.Password, host, d.Port, d.ServerName, fp, d.Remark,
+		)
+	case PresetXHTTPReality:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=xhttp&encryption=none&security=reality&pbk=%s&fp=%s&sni=%s&sid=%s&spx=%%2F&path=%s&mode=%s#%s",
+			d.UUID, host, d.Port, d.PublicKey, fp, d.ServerName, d.ShortId,
+			url.QueryEscape(d.Path), d.Mode, d.Remark,
+		)
+	case PresetTLSEncryption:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=xhttp&encryption=%s&security=tls&sni=%s&fp=%s&alpn=h2&path=%s&mode=%s#%s",
+			d.UUID, host, d.Port, url.QueryEscape(d.Encryption), d.ServerName, fp,
+			url.QueryEscape(d.Path), d.Mode, d.Remark,
 		)
 	}
 	return ""

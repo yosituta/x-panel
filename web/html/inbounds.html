@@ -771,21 +771,27 @@
       </a-button>
 
       <a-button block size="large" class="one-click-opt" style="margin-bottom: 10px; height: auto; padding: 10px 14px; text-align: left"
-        :loading="oneClickLoading && oneClickPending === 'tls'" @click="oneClickPreset('tls')">
+        :loading="oneClickLoading && oneClickPending === 'xhttp-reality'" @click="oneClickPreset('xhttp-reality')">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
-          <span style="font-size: 14px">2&nbsp;&nbsp;VLESS + TCP + TLS</span>
+          <span style="font-size: 14px">2&nbsp;&nbsp;VLESS + XHTTP + Reality</span>
           <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt2Desc" }}</span>
         </div>
       </a-button>
 
-      <a-button block size="large" class="one-click-opt" style="height: auto; padding: 10px 14px; text-align: left"
-        :loading="oneClickLoading && oneClickPending === 'trojan'" @click="oneClickPreset('trojan')">
+      <a-button block size="large" class="one-click-opt" style="margin-bottom: 10px; height: auto; padding: 10px 14px; text-align: left"
+        :loading="oneClickLoading && oneClickPending === 'tls-encryption'" @click="oneClickPreset('tls-encryption')">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
-          <span style="font-size: 14px">3&nbsp;&nbsp;Trojan + TCP + TLS</span>
+          <span style="font-size: 14px">3&nbsp;&nbsp;VLESS Encryption + TLS（可选套 CDN）</span>
           <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt3Desc" }}</span>
         </div>
       </a-button>
 
+      <a-button block size="large" class="one-click-opt" style="height: auto; padding: 10px 14px; text-align: left" disabled>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+          <span style="font-size: 14px">4&nbsp;&nbsp;Switch + Vision Seed</span>
+          <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt4Desc" }}</span>
+        </div>
+      </a-button>
       <a-collapse style="margin-top: 16px">
         <a-collapse-panel key="adv" :header="`{{ i18n "pages.inbounds.oneClick.advancedOptions" }}`">
           <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
@@ -795,6 +801,8 @@
                 <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
                 <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetTrojan" }}</a-select-option>
                 <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
+                <a-select-option value="xhttp-reality">{{ i18n "pages.inbounds.oneClick.presetXHTTPReality" }}</a-select-option>
+                <a-select-option value="tls-encryption">{{ i18n "pages.inbounds.oneClick.presetTLSEncryption" }}</a-select-option>
                 <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
                 <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
                 <a-select-option value="reality-legacy">{{ i18n "pages.inbounds.oneClick.presetRealityLegacy" }}</a-select-option>

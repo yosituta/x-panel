@@ -328,10 +328,13 @@
 "descriptionContent" = "1、此功能將自動產生 VLESS + TCP + Reality (xtls-rprx-vision) 和 VLESS + XHTTP + Reality 協定的入站，以上最前面兩種協定組合適合直連，\r\n2、或 VLESS Encryption + XHTTP + TLS（可選套CDN）協定的入站，\r\n3、並隨機分配一個可用端口，請確保此端口放行，生成後請直接複製【鏈接地址】，\r\n4、此處的【一鍵配置】生成功能，跟【入站】的數據是打通的，\r\n5、你可以在一鍵創建後於列表中，手動查看/複製或編輯信息，以便添加其他參數。"
 
 "pickTip" = "選擇一種協定，點一下直接產生可用節點（連接埠自動分配）"
-"opt1Desc" = "推薦 · 無需網域和憑證 · 手機/電腦通用"
-"opt2Desc" = "需面板已設定憑證 · 相容性最好"
-"opt3Desc" = "需面板已設定憑證 · 可作備用"
+"opt1Desc" = "推薦 · 無需網域和憑證"
+"opt2Desc" = "無需憑證 · 抗封鎖更強 · 需較新用戶端"
+"opt3Desc" = "需面板已設定憑證 · 可套 CDN"
 "advancedOptions" = "進階選項（數量 / 連接埠 / 備註 / 流量 / 偷用網域）"
+"opt4Desc" = "開發中"
+"presetXHTTPReality" = "VLESS + XHTTP + Reality"
+"presetTLSEncryption" = "VLESS Encryption + XHTTP + TLS（可套 CDN）"
 [pages.inbounds.oneClick.preset]
 "vless_reality" = "VLESS + TCP + Reality + Vision"
 "vless_xhttp_reality" = "VLESS + XHTTP + Reality"
