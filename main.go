@@ -584,6 +584,7 @@ func main() {
 		fmt.Println("    run            run web panel")
 		fmt.Println("    migrate        migrate form other/old x-ui")
 		fmt.Println("    setting        set settings")
+		fmt.Println("    backup         生成/列出/还原数据快照（x-ui backup -h 查看用法）")
 	}
 
 	flag.Parse()
@@ -602,6 +603,8 @@ func main() {
 		runWebServer()
 	case "migrate":
 		migrateDb()
+	case "backup":
+		runBackupCommand(os.Args[2:])
 	case "setting":
 		err := settingCmd.Parse(os.Args[2:])
 		if err != nil {

@@ -3,7 +3,9 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"time"
 
 	"x-ui/web/global"
@@ -54,6 +56,10 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
 	// 【开源增强】手动触发一次流量/到期检查，便于验证 Telegram 告警是否配置成功
 	g.POST("/checkAlerts", a.checkAlerts)
+	// 【开源增强】数据快照与还原
+	g.POST("/backup", a.backupNow)
+	g.GET("/backups", a.backupList)
+	g.POST("/restore/:name", a.restoreBackup)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -394,4 +400,50 @@ func (a *ServerController) checkAlerts(c *gin.Context) {
 		return
 	}
 	jsonObj(c, gin.H{"count": count}, nil)
+}
+
+// 【开源增强】立即生成一份数据快照
+func (a *ServerController) backupNow(c *gin.Context) {
+	var svc service.BackupService
+	snap, err := svc.Create(service.DefaultBackupKeep)
+	if err != nil {
+		jsonMsg(c, "生成快照失败", err)
+		return
+	}
+	jsonObj(c, snap, nil)
+}
+
+// 【开源增强】列出已有快照
+func (a *ServerController) backupList(c *gin.Context) {
+	var svc service.BackupService
+	items, err := svc.List()
+	if err != nil {
+		jsonMsg(c, "读取快照列表失败", err)
+		return
+	}
+	jsonObj(c, items, nil)
+}
+
+// 【开源增强】从快照还原；还原成功后自动重启面板使新库生效
+func (a *ServerController) restoreBackup(c *gin.Context) {
+	name := c.Param("name")
+	var svc service.BackupService
+	if err := svc.Restore(name); err != nil {
+		jsonMsg(c, "还原失败", err)
+		return
+	}
+	jsonObj(c, gin.H{"restored": name, "restarting": true}, nil)
+	schedulePanelRestart()
+}
+
+// schedulePanelRestart 交给独立的 systemd 进程去重启，
+// 避免当前请求还没返回就自杀导致前端看到网络错误
+func schedulePanelRestart() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	cmd := exec.Command("sh", "-c", "sleep 2; systemctl restart x-panel")
+	if err := cmd.Start(); err != nil {
+		fmt.Println("安排重启失败:", err)
+	}
 }

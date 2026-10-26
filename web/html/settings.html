@@ -145,6 +145,30 @@
                     </template>
                     {{ template "settings/panel/subscription/json" . }}
                   </a-tab-pane>
+                  <a-tab-pane key="6" :style="{ paddingTop: '20px' }">
+                    <template #tab>
+                      <a-icon type="database"></a-icon>
+                      <span>数据快照</span>
+                    </template>
+                    <a-card size="small">
+                      <a-space style="margin-bottom: 12px">
+                        <a-button type="primary" icon="save" :loading="backupLoading" @click="createBackup">立即备份</a-button>
+                        <a-button icon="reload" @click="loadBackups">刷新</a-button>
+                        <span style="opacity: .65; font-size: 12px">
+                          存于数据库同目录 backups/，默认保留最近 10 份；还原后会自动重启面板
+                        </span>
+                      </a-space>
+                      <a-table :columns="backupColumns" :data-source="backups" size="small"
+                        :pagination="false" row-key="name" :locale="{ emptyText: '还没有快照' }">
+                        <template slot="action" slot-scope="text, record">
+                          <a-popconfirm title="还原会覆盖当前数据库并重启面板，确定？"
+                            ok-text="还原" cancel-text="取消" @confirm="restoreBackup(record.name)">
+                            <a-button type="link" size="small" style="color: #ff4d4f">还原</a-button>
+                          </a-popconfirm>
+                        </template>
+                      </a-table>
+                    </a-card>
+                  </a-tab-pane>
                 </a-tabs>
               </a-col>
             </a-row>
@@ -178,6 +202,15 @@
       },
       oldAllSetting: new AllSetting(),
       allSetting: new AllSetting(),
+      // 【开源增强】数据快照
+      backups: [],
+      backupLoading: false,
+      backupColumns: [
+        { title: '快照文件', dataIndex: 'name', key: 'name' },
+        { title: '大小', dataIndex: 'sizeText', key: 'sizeText', width: 110 },
+        { title: '时间', dataIndex: 'timeText', key: 'timeText', width: 180 },
+        { title: '操作', key: 'action', width: 90, scopedSlots: { customRender: 'action' } },
+      ],
       saveBtnDisable: true,
       user: {},
       lang: LanguageManager.getLanguage(),
@@ -287,6 +320,41 @@
       }
     },
     methods: {
+      // 【开源增强】数据快照：列表 / 备份 / 还原
+      async loadBackups() {
+        const msg = await HttpUtil.get('/panel/api/server/backups');
+        if (msg.success) {
+          this.backups = (msg.obj || []).map(it => ({
+            ...it,
+            sizeText: (it.size / 1024).toFixed(1) + ' KB',
+            timeText: new Date(it.time).toLocaleString(),
+          }));
+        } else {
+          this.$message.error(msg.msg || '读取快照失败');
+        }
+      },
+      async createBackup() {
+        this.backupLoading = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/server/backup');
+          if (msg.success) {
+            this.$message.success('快照已生成：' + msg.obj.name);
+            await this.loadBackups();
+          } else {
+            this.$message.error(msg.msg || '生成快照失败');
+          }
+        } finally {
+          this.backupLoading = false;
+        }
+      },
+      async restoreBackup(name) {
+        const msg = await HttpUtil.post('/panel/api/server/restore/' + encodeURIComponent(name));
+        if (msg.success) {
+          this.$message.success('还原完成，面板即将重启，请稍候重新登录');
+        } else {
+          this.$message.error(msg.msg || '还原失败');
+        }
+      },
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
       },
@@ -601,6 +669,8 @@
       }
 
       await this.getAllSetting();
+      // 【开源增强】初始化数据快照列表
+      this.loadBackups();
 
       while (true) {
         await PromiseUtil.sleep(1000);
