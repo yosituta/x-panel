@@ -6,6 +6,238 @@
 # ============================================================
 X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 
+# ============================================================
+# 无人值守安装（--auto）
+#
+# 用法示例：
+#   bash install.sh --auto --domain panel1.example.com --email me@example.com
+#   bash install.sh --auto --panel-port 23333 --path /xp-abc123 \
+#                   --user admin --pass 'MyPwd' --domain panel1.example.com --email me@example.com
+#   bash install.sh --auto --no-cert --dry-run     # 只看计划不执行
+#
+# 不带 --auto 时走原来的交互式安装流程，行为不变。
+# ============================================================
+
+AUTO_INSTALL=0
+A_PORT=23333
+A_PATH=""
+A_USER="admin"
+A_PASS=""
+A_DOMAIN=""
+A_EMAIL=""
+A_CERT=1
+A_DRY=0
+A_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --auto) AUTO_INSTALL=1; shift ;;
+        --panel-port) A_PORT="$2"; shift 2 ;;
+        --path) A_PATH="$2"; shift 2 ;;
+        --user) A_USER="$2"; shift 2 ;;
+        --pass) A_PASS="$2"; shift 2 ;;
+        --domain) A_DOMAIN="$2"; shift 2 ;;
+        --email) A_EMAIL="$2"; shift 2 ;;
+        --version) A_VERSION="$2"; shift 2 ;;
+        --no-cert) A_CERT=0; shift ;;
+        --dry-run) A_DRY=1; shift ;;
+        -h|--help)
+            sed -n '/^# 无人值守安装/,/^# ====/p' "$0" 2>/dev/null | head -20
+            exit 0
+            ;;
+        *) shift ;;
+    esac
+done
+
+auto_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)  echo amd64 ;;
+        aarch64|arm64) echo arm64 ;;
+        *) echo "" ;;
+    esac
+}
+
+auto_rand() {
+    tr -dc 'a-z0-9' </dev/urandom 2>/dev/null | head -c "${1:-8}"
+}
+
+auto_install() {
+    local green='\033[0;32m' yellow='\033[0;33m' red='\033[0;31m' plain='\033[0m'
+
+
+    local arch
+    arch="$(auto_arch)"
+    if [[ -z "$arch" ]]; then
+        echo -e "${red}不支持的架构：$(uname -m)${plain}"; return 1
+    fi
+
+    [[ -z "$A_PATH" ]] && A_PATH="/xp-$(auto_rand 6)"
+    A_PATH="/${A_PATH#/}"
+    A_PATH="${A_PATH%/}"
+    [[ -z "$A_PASS" ]] && A_PASS="$(auto_rand 16)"
+
+    if [[ -z "$A_VERSION" ]]; then
+        A_VERSION=$(curl -fsSL "https://api.github.com/repos/${X_PANEL_REPO}/releases/latest" 2>/dev/null \
+            | grep '"tag_name":' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+    fi
+    A_VERSION="${A_VERSION#v}"
+    if [[ -z "$A_VERSION" ]]; then
+        echo -e "${red}无法获取最新版本号，可用 --version v1.1.1 手动指定${plain}"; return 1
+    fi
+
+    local use_cert=0
+    if [[ "$A_CERT" == "1" && -n "$A_DOMAIN" ]]; then
+        use_cert=1
+        if [[ -z "$A_EMAIL" ]]; then
+            A_EMAIL="admin@${A_DOMAIN#*.}"
+        fi
+    fi
+
+    echo -e "${green}==== 安装计划 ====${plain}"
+    echo "  仓库      : ${X_PANEL_REPO}"
+    echo "  版本      : v${A_VERSION}"
+    echo "  架构      : ${arch}"
+    echo "  面板端口  : ${A_PORT}"
+    echo "  访问路径  : ${A_PATH}"
+    echo "  账号      : ${A_USER}"
+    echo "  密码      : ${A_PASS}"
+    echo "  Xray 内核 : 随包固定版本（勿随意升级，见 CHANGELOG）"
+    if [[ "$use_cert" == "1" ]]; then
+        echo "  HTTPS     : 是，域名 ${A_DOMAIN}（邮箱 ${A_EMAIL}）"
+    else
+        echo "  HTTPS     : 否（不申请证书）"
+    fi
+
+    if [[ "$A_DRY" == "1" ]]; then
+        echo -e "${yellow}--dry-run：未做任何修改${plain}"
+        return 0
+    fi
+
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${red}请用 root 运行${plain}"; return 1
+    fi
+
+    echo -e "${green}---- 1/6 安装依赖 ----${plain}"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >/dev/null 2>&1 || true
+    apt-get install -y -qq curl wget tar socat cron ca-certificates >/dev/null 2>&1 || true
+
+    echo -e "${green}---- 2/6 准备 acme.sh ----${plain}"
+    if [[ ! -x /root/.acme.sh/acme.sh ]]; then
+        curl -s https://get.acme.sh | sh -s email="${A_EMAIL:-noreply@example.com}" >/dev/null 2>&1 \
+            && echo "  acme.sh 已安装" || echo "  acme.sh 安装失败（可用 x-ui 菜单 18 重试）"
+    else
+        echo "  acme.sh 已存在"
+    fi
+
+    echo -e "${green}---- 3/6 下载安装包 ----${plain}"
+    local url="https://github.com/${X_PANEL_REPO}/releases/download/v${A_VERSION}/x-ui-linux-${arch}.tar.gz"
+    echo "  ${url}"
+    rm -rf /tmp/xp-install && mkdir -p /tmp/xp-install && cd /tmp/xp-install || return 1
+    if ! curl -fL --retry 3 --connect-timeout 20 -o pkg.tar.gz "$url"; then
+        echo -e "${red}下载失败，检查网络或版本号${plain}"; return 1
+    fi
+    tar -zxf pkg.tar.gz || { echo -e "${red}解压失败${plain}"; return 1; }
+
+    echo -e "${green}---- 4/6 安装到 /usr/local/x-ui ----${plain}"
+    systemctl stop x-ui >/dev/null 2>&1 || true
+    rm -rf /usr/local/x-ui
+    mv x-ui /usr/local/x-ui || return 1
+    cd /usr/local/x-ui || return 1
+    chmod +x x-ui x-ui.sh
+    [[ -f "bin/xray-linux-${arch}" ]] && chmod +x "bin/xray-linux-${arch}"
+    cp -f x-ui.service /etc/systemd/system/x-ui.service
+    systemctl daemon-reload
+    systemctl enable x-ui >/dev/null 2>&1 || true
+
+    echo -e "${green}---- 5/6 写入面板设置 ----${plain}"
+    if ! ./x-ui setting -port "$A_PORT" -webBasePath "$A_PATH" \
+            -username "$A_USER" -password "$A_PASS" >/tmp/xp-setting.log 2>&1; then
+        echo -e "${red}写入设置失败：${plain}"; tail -5 /tmp/xp-setting.log; return 1
+    fi
+    echo "  端口 ${A_PORT} / 路径 ${A_PATH} 已写入"
+
+    local cert_done=0
+    if [[ "$use_cert" == "1" ]]; then
+        echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
+        /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
+        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --force >/tmp/xp-acme.log 2>&1; then
+            mkdir -p "/root/cert/${A_DOMAIN}"
+            /root/.acme.sh/acme.sh --install-cert -d "$A_DOMAIN" --ecc \
+                --key-file "/root/cert/${A_DOMAIN}/privkey.pem" \
+                --fullchain-file "/root/cert/${A_DOMAIN}/fullchain.pem" \
+                --reloadcmd "x-ui restart" >/dev/null 2>&1
+            if [[ -f "/root/cert/${A_DOMAIN}/fullchain.pem" ]]; then
+                ./x-ui setting -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \
+                               -webCertKey "/root/cert/${A_DOMAIN}/privkey.pem" >/dev/null 2>&1
+                cert_done=1
+                echo "  证书已签发并绑定：/root/cert/${A_DOMAIN}/"
+            fi
+        else
+            echo -e "${yellow}  证书申请失败，日志：/tmp/xp-acme.log${plain}"
+            echo -e "${yellow}  常见原因：域名未解析到本机 / 80 端口被占用或被墙${plain}"
+            tail -6 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
+        fi
+    else
+        echo -e "${green}---- 6/6 跳过证书 ----${plain}"
+    fi
+
+    # 防火墙
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow "$A_PORT"/tcp >/dev/null 2>&1 || true
+        [[ "$use_cert" == "1" ]] && ufw allow 80/tcp >/dev/null 2>&1 || true
+        echo "  ufw 已放行 ${A_PORT}/tcp"
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        firewall-cmd --add-port="$A_PORT"/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+        echo "  firewalld 已放行 ${A_PORT}/tcp"
+    fi
+
+    systemctl restart x-ui
+    sleep 6
+    local active
+    active=$(systemctl is-active x-ui)
+
+    local scheme="http"
+    [[ "$cert_done" == "1" ]] && scheme="https"
+    local host="${A_DOMAIN:-$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)}"
+
+    echo ""
+    echo -e "${green}========================================${plain}"
+    echo -e "${green} X-Panel 安装完成${plain}"
+    echo -e "${green}========================================${plain}"
+    echo "  服务状态 : ${active}"
+    echo "  面板版本 : $(./x-ui -v 2>/dev/null)"
+    echo "  Xray 内核: $(./bin/xray-linux-${arch} version 2>/dev/null | head -1)"
+    echo ""
+    echo -e "  登录地址 : ${yellow}${scheme}://${host}:${A_PORT}${A_PATH}/${plain}"
+    echo "  用户名   : ${A_USER}"
+    echo "  密码     : ${A_PASS}"
+    echo ""
+    if [[ "$cert_done" != "1" ]]; then
+        echo -e "${yellow}未启用 HTTPS。要启用：${plain}"
+        echo "  1) 先把域名 A 记录指到本机（建议保持灰云，不要走 CDN）"
+        echo "  2) 输入 x-ui → 18 (SSL 证书管理) → 1 (获取证书)"
+        echo "  3) 完成后用 https://域名:${A_PORT}${A_PATH}/ 访问"
+        echo ""
+    fi
+    echo -e "${yellow}下一步（多台服务器请按此命名规范）：${plain}"
+    echo "  面板域名 : panelN.example.com  （灰云，直接指向本机 IP）"
+    echo "  节点域名 : cdnN.example.com    （橙云，Cloudflare 代理）"
+    echo "  在面板【一键配置】里选预设，宿主域名与节点域名同号时，CDN 链接会自动带出。"
+    echo ""
+    echo "  管理菜单 : 输入 x-ui"
+    echo "  日志     : journalctl -u x-ui -f"
+    return 0
+}
+
+if [[ "$AUTO_INSTALL" == "1" ]]; then
+    auto_install
+    exit $?
+fi
+
+
 
 # ==========================================================
 # X-Panel 开源增强版 安装脚本

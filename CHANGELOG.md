@@ -8,6 +8,30 @@
 
 ---
 
+## 一键安装与多机部署（2026-10-26）
+
+### install.sh 新增无人值守模式
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com --email you@example.com
+```
+
+- 支持 `--panel-port / --path / --user / --pass / --domain / --email / --no-cert / --version / --dry-run`
+- 未指定时自动生成访问路径与 16 位随机密码，安装完成打印登录地址与凭据
+- 预装 acme.sh（与 3x-ui 一致），有域名时直接用 standalone 模式签发并绑定证书
+- 自动放行 ufw / firewalld 的面板端口
+- 不带 `--auto` 时完全走原来的交互式流程，行为不变
+
+### CDN 域名按序号配对
+
+`panel2.example.com` 会优先嗅探 `cdn2.example.com`，其次才是 `cdn / cdn1 / cdn2 / proxy / cf / ws`，
+多台服务器不会串到同一台。
+
+### 新增 docs/DEPLOY.md
+
+域名规划（面板灰云 / 节点橙云）、单台与多台安装、升级回滚、内核版本策略、排错速查。
+
 ## CDN 自动识别（2026-10-26）
 
 TLS 系预设（TLS / Trojan / VLESS 加密）生成节点时，会自动判断面板域名是否在 Cloudflare 后面：

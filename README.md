@@ -76,6 +76,15 @@ git ls-files | grep -E "\.db$|\.pem$|\.key$|\.env$" || echo "无敏感文件"
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
+
+无人值守安装（多台服务器推荐，可自动申请证书）：
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com --email you@example.com
+```
+
+完整部署说明（域名规划、多台批量、排错）：[docs/DEPLOY.md](docs/DEPLOY.md)
 ```
 
 安装完成后按提示设置端口、路径、账号密码。管理脚本：

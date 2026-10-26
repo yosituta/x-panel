@@ -76,6 +76,15 @@ git ls-files | grep -E "\.db$|\.pem$|\.key$|\.env$" || echo "no secrets tracked"
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
+
+Unattended install (recommended for multiple servers; can obtain the certificate automatically):
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com --email you@example.com
+```
+
+Full deployment guide (domain layout, multiple servers, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
 ```
 
 Then set the port, base path and credentials when prompted. Management menu:

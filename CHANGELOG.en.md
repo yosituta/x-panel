@@ -8,6 +8,31 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## One-command install and multi-server deployment (2026-10-26)
+
+### `install.sh` gains an unattended mode
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com --email you@example.com
+```
+
+- Flags: `--panel-port / --path / --user / --pass / --domain / --email / --no-cert / --version / --dry-run`
+- Generates the access path and a random 16-character password when omitted, then prints the URL and credentials
+- Preinstalls acme.sh (same as 3x-ui) and issues + binds a certificate in standalone mode when a domain is given
+- Opens the panel port in ufw / firewalld automatically
+- Without `--auto` the original interactive flow is unchanged
+
+### CDN domains pair by index
+
+`panel2.example.com` probes `cdn2.example.com` first, then falls back to `cdn / cdn1 / cdn2 / proxy / cf / ws`,
+so multiple servers do not pick each other's CDN hostname.
+
+### New docs/DEPLOY.md
+
+Domain layout (panel DNS-only, node proxied), single and multi-server install, upgrade and rollback,
+the pinned-core policy, and a troubleshooting table.
+
 ## Automatic CDN detection (2026-10-26)
 
 When a TLS-based preset (TLS / Trojan / VLESS Encryption) creates a node, the panel now checks whether its own domain sits behind Cloudflare:
