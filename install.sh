@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # ============================================================
-# 【发布前必改】把下面改成你自己的 GitHub 仓库（owner/repo）
-# 不改的话，安装会去拉上游 xeefei/x-panel 的二进制，装出来没有本分支的功能
-# 也可以用环境变量覆盖：X_PANEL_REPO=me/my-panel bash install.sh
+# 本项目仓库：https://github.com/yosituta/x-panel
+# 想装上游原版可覆盖：X_PANEL_REPO=xeefei/x-panel bash install.sh
 # ============================================================
-X_PANEL_REPO="${X_PANEL_REPO:-xeefei/x-panel}"
+X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 
 
 # ==========================================================
-# X-Panel 统一安装脚本 (付费/免费二合一)
-# 作者: X-Panel
+# X-Panel 开源增强版 安装脚本
+# 基于 xeefei/X-Panel (GPLv3) 修改
 # ==========================================================
 
 red='\033[0;31m'
@@ -502,7 +501,7 @@ install_free_version() {
     echo ""
     echo -e "----------------------------------------------"
     echo ""
-    echo -e "${green}〔X-Panel面板〕项目地址：${yellow}https://github.com/xeefei/x-panel${plain}" 
+    echo -e "${green}〔X-Panel面板〕项目地址：${yellow}https://github.com/yosituta/x-panel${plain}" 
     echo ""
     echo -e "${green} 详细安装教程：${yellow}https://xeefei.blogspot.com/2025/09/x-panel.html${plain}"
     echo ""

@@ -103,10 +103,10 @@ jobs:
             dist/sha256sum.txt
           generate_release_notes: true
           body: |
-            安装（把 `<owner>/<repo>` 换成你的仓库）：
+            安装：
 
             ```bash
-            bash <(curl -Ls https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh)
+            bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
             ```
 
             产物结构：`x-ui/{x-ui, x-ui.sh, x-ui.service, bin/xray-linux-<arch>}`

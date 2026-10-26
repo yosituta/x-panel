@@ -2,6 +2,8 @@
 
 本仓库（下称“本项目”）是 **GPLv3 开源衍生项目**，非原创作品，也不是 X-Panel 官方版本。
 
+本项目仓库：**https://github.com/yosituta/x-panel**
+
 ## 上游来源
 
 | 层级 | 项目 | 关系 |

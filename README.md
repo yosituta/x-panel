@@ -48,32 +48,32 @@
 | 定时报告 | 每天/每周/每月指定时间推送，内容项可勾选，支持预览与立即发送 |
 | Telegram | `/link` 取节点链接、`/panels` `/panel` 管多面板、`/webssh` 查网页终端 |
 
-## 发布到自己的仓库（重要）
+## 仓库地址
 
-本仓库默认仍指向上游地址。**推到你自己的 GitHub 之前，先把 `install.sh` 和 `x-ui.sh` 顶部的这一行改成你的仓库**：
+本项目仓库：**https://github.com/yosituta/x-panel**
+
+`install.sh` / `x-ui.sh` 里的 `X_PANEL_REPO` 已指向该仓库。想临时装上游原版：
 
 ```bash
-X_PANEL_REPO="${X_PANEL_REPO:-你的用户名/仓库名}"
+X_PANEL_REPO=xeefei/x-panel bash install.sh
 ```
 
-不改的话，一键安装会去拉上游的二进制，装出来没有本分支的功能。改完打 tag 并上传 release 产物（`x-ui-linux-amd64.tar.gz`），安装脚本会自动取最新 release。
+发布新版本：改完代码 `git tag v1.0.1 && git push origin v1.0.1`，GitHub Actions 会自动编译 amd64/arm64（CGO）并把产物挂到 Release。
 
-发布检查清单：
+发布前自检：
 
 ```bash
 go build ./... && go vet ./... && go test ./...
 bash -n install.sh x-ui.sh scripts/*.sh
-git grep -n "xeefei/x-panel" -- install.sh x-ui.sh   # 确认只剩版权声明
+git ls-files | grep -E "\.db$|\.pem$|\.key$|\.env$" || echo "无敏感文件"
 ```
-
-还要确认没有把 `*.db`、证书、`.env`、日志提交进仓库。
 
 ## 快速开始
 
 ### 一键安装（推荐）
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/<你的用户名>/<仓库名>/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
 ```
 
 安装完成后按提示设置端口、路径、账号密码。管理脚本：
