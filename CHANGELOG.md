@@ -10,25 +10,29 @@
 
 ## 一键配置简化 + 固定 Xray 内核（2026-10-26）
 
-### 修复：Reality 节点在 iOS Shadowrocket 上握手失败
+### 根因：REALITY 从 Xray 26.7 起改用后量子混合密钥交换
 
-现象：本分支打包的最新 Xray（26.10.21）生成的 Reality 节点，iPhone 上「延迟测试通过、但一个字节都传不出去」，服务端日志为：
+Reality 节点在本分支原有打包（Xray 26.10.21）下，iOS Shadowrocket 表现为「能连、延迟测试通过，但一个字节都传不出去」，服务端日志：
 
 ```
 REALITY: processed invalid connection from x.x.x.x: authentication failed or validation criteria not met
 ```
 
-排查方式：在同一台服务器上换内核做 A/B 实测（配置完全不变）：
+同一台服务器、同一份入站配置、只更换内核的 A/B 实测：
 
-| Xray 内核 | Shadowrocket 实测 |
+| Xray 内核 | iOS Shadowrocket |
 | --- | --- |
-| 26.10.21 | ❌ 认证失败 |
 | 25.9.11 | ✅ 正常出网 |
-| 26.9.9 | 见下方说明 |
+| 26.9.9 | ❌ 认证失败 |
+| 26.10.21 | ❌ 认证失败 |
 
-结论：问题在内核版本，不在 Reality 参数。实测 `target` / `dest`、单域名 / 双 serverNames、2 位 / 8 位 shortId 三种写法在可用内核上都能通，因此代码无需改参数。
+配置侧已排除：`target` / `dest` 两种写法、单域名 / 双 serverNames、2 位 / 8 位 shortId，在 25.9.11 上都能通，在 26.x 上都失败。
 
-修复：`.github/workflows/release.yml` 不再取 `releases/latest`，改为固定 `XRAY_VERSION`（与上游一致）。升级该版本号前必须用 iOS 实测。
+真正原因见 Xray-core issue #6477：Xray 26.7 起 REALITY 的握手使用 **X25519MLKEM768**（X25519 + ML-KEM-768 后量子混合），老客户端（Shadowrocket、mihomo 1.19.x 等）只实现 X25519，双方派生的会话密钥不一致，服务端判定认证失败并按普通访客丢弃连接。
+
+### 修复：固定内核到 v25.9.11
+
+`.github/workflows/release.yml` 不再取 `releases/latest`，改为固定 `XRAY_VERSION: v25.9.11`，并在注释里写明实测表与 issue 链接。25.9.11 服务端对 26.x 客户端向后兼容，因此新客户端不受影响；需要新内核的用户可在面板【设置 → Xray 版本】自行切换。
 
 ### 变更：一键配置改为三选一
 

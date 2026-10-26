@@ -10,24 +10,29 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ## Simpler one-click setup + pinned Xray core (2026-10-26)
 
-### Fix: Reality handshake failing on iOS Shadowrocket
+### Root cause: REALITY switched to a post-quantum hybrid key exchange in Xray 26.7
 
-Symptom: Reality inbounds created by this fork's bundled Xray (26.10.21) connect from iPhone but transfer nothing, while the server log shows:
+With this fork's previous bundle (Xray 26.10.21), Reality inbounds connect from iOS Shadowrocket and pass the latency test, but not a single byte gets through. The server logs:
 
 ```
 REALITY: processed invalid connection from x.x.x.x: authentication failed or validation criteria not met
 ```
 
-Method: A/B test on the same server, changing only the core:
+A/B test on one machine with an identical inbound, changing only the core:
 
-| Xray core | Shadowrocket result |
+| Xray core | iOS Shadowrocket |
 | --- | --- |
-| 26.10.21 | failed |
 | 25.9.11 | works |
+| 26.9.9 | fails |
+| 26.10.21 | fails |
 
-Conclusion: the core version is the cause, not the Reality parameters. With a working core, all three variants (`target` / `dest`, single vs. double `serverNames`, 2-char vs. 8-char `shortId`) connect fine, so no parameter changes were needed.
+Configuration was ruled out: `target` vs. `dest`, single vs. double `serverNames`, and 2-char vs. 8-char `shortId` all work on 25.9.11 and all fail on 26.x.
 
-Fix: `.github/workflows/release.yml` no longer resolves `releases/latest`; it pins `XRAY_VERSION` (matching upstream). Bump it only after testing Reality from an iPhone.
+The actual cause is Xray-core issue #6477: since 26.7, REALITY negotiates **X25519MLKEM768** (a hybrid of X25519 and ML-KEM-768). Clients that only implement X25519 (Shadowrocket, mihomo 1.19.x and similar) derive a different session key, so the server treats them as failed authentication and falls back to serving the camouflage site.
+
+### Fix: pin the core to v25.9.11
+
+`.github/workflows/release.yml` no longer resolves `releases/latest`; it pins `XRAY_VERSION: v25.9.11` with the measurements and the issue link in a comment. A 25.9.11 server stays backward compatible with 26.x clients, so newer clients are unaffected; users who want a newer core can switch it under Settings → Xray version.
 
 ### Change: one-click setup reduced to three choices
 

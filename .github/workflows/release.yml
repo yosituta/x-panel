@@ -53,11 +53,21 @@ jobs:
 
       - name: 下载 Xray-core（固定版本）
         env:
-          # 固定内核版本，不跟随 latest。
-          # 原因：Reality 握手在部分客户端（如 iOS Shadowrocket）上对内核版本敏感，
-          # 26.10.x 服务端会出现 "REALITY: authentication failed"，25.9.11 / 26.9.9 正常。
-          # 升级此版本号前，必须用 iPhone + Shadowrocket 实测 Reality 节点能否出网。
-          XRAY_VERSION: v26.9.9
+          # 【不要随意升级】固定内核版本，不跟随 latest。
+          #
+          # 原因：REALITY 从 Xray 26.7 起改用 X25519MLKEM768（后量子混合密钥交换），
+          # 老客户端（iOS Shadowrocket、mihomo 1.19.x）不支持，表现为「能连但一个字节都传不出去」，
+          # 服务端日志为：REALITY: processed invalid connection ... authentication failed
+          # 参见 https://github.com/XTLS/Xray-core/issues/6477
+          #
+          # 实测（同一台机器、同一份配置、只换内核）：
+          #   25.9.11    iOS Shadowrocket ✅
+          #   26.9.9     iOS Shadowrocket ❌
+          #   26.10.21   iOS Shadowrocket ❌
+          #
+          # 升级前必须用 iPhone + Shadowrocket 实测 Reality 节点能否出网。
+          # 需要新内核的用户可在面板【设置 → Xray 版本】自行切换。
+          XRAY_VERSION: v25.9.11
         run: |
           set -e
           url="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${{ matrix.xray_asset }}"
