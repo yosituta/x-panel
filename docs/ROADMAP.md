@@ -15,6 +15,9 @@
 | 33 | 内置订阅转换（V2Ray / Clash / sing-box / Surge） | ✅ | `web/service/subscribe_node.go`、`subscribe_build.go`、`subscribe_render.go`、`web/controller/sub.go`、`GET /sub/:subid` |
 | 34 | 一键配置「自动」预设（有证书走 TLS，否则 Reality） | ✅ | `batch_deploy.go` `PresetAuto`、`inbounds.html`（Reality 系列收进「高级预设」开关） |
 | 35 | 流量与到期告警（Telegram 推送 + 同阈值去重） | ✅ | `web/service/alert.go`、`alert_run.go`、`web/job/alert_job.go`、`POST /panel/api/server/checkAlerts` |
+| 36 | 节点上/下线 TG 通知（#25） | ✅ | `web/service/presence.go`、`web/job/presence_job.go`、`POST /panel/api/server/checkPresence` |
+| 37 | TG 获取节点链接（#19） | ✅ | `tgbot.go` `/link [关键字]`、`subscribe_all.go`、`GET /panel/api/server/nodeLinks` |
+| 38 | 网页版 SSH / ttyd（#7、#10、#12） | ✅ | `scripts/ttyd.sh`、`x-ui.sh` 菜单 26、TG `/webssh` |
 
 ### 第一批实测要点
 
