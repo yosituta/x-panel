@@ -597,6 +597,10 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 			o.RemarkPrefix = "tls"
 		case PresetTrojan:
 			o.RemarkPrefix = "trojan"
+		case PresetXHTTPReality:
+			o.RemarkPrefix = "xhttp"
+		case PresetTLSEncryption:
+			o.RemarkPrefix = "venc"
 		}
 	}
 
@@ -607,7 +611,7 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 
 	// TLS / Trojan 预设需要证书：取面板设置里的证书，域名优先用请求里的 Domain，其次 Host
 	var creds *tlsCreds
-	if o.Preset == PresetTLS || o.Preset == PresetTrojan {
+	if o.Preset == PresetTLS || o.Preset == PresetTrojan || o.Preset == PresetTLSEncryption {
 		var settingService SettingService
 		cert, err1 := settingService.GetCertFile()
 		key, err2 := settingService.GetKeyFile()
@@ -631,7 +635,8 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		if domain == "" {
 			domain = legacyRealityDests[time.Now().UnixNano()%int64(len(legacyRealityDests))]
 		}
-	} else if o.Preset == PresetReality || o.Preset == PresetRealityNoVision || o.Preset == PresetRealityUDP443 {
+	} else if o.Preset == PresetReality || o.Preset == PresetRealityNoVision ||
+		o.Preset == PresetRealityUDP443 || o.Preset == PresetXHTTPReality {
 		if domain == "" {
 			var domainService RealityDomainService
 			domain = domainService.RandomAliveDomain(3 * time.Second).Domain
