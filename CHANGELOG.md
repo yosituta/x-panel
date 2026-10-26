@@ -1,5 +1,7 @@
 # 变更记录
 
+**[简体中文](CHANGELOG.md)** · [English](CHANGELOG.en.md)
+
 本文件按 GPLv3 要求记录本分支相对上游 [xeefei/X-Panel](https://github.com/xeefei/X-Panel) 的修改。
 
 基线：上游 `main`（2026-10 拉取）。面板版本号沿用上游 `26.9.13`，功能迭代以本文为准。
