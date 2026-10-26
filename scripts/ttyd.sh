@@ -48,9 +48,13 @@ install_pkg() {
 
 panel_cert() {
   # 复用面板证书：优先读面板设置里的路径，其次按域名目录猜
-  local cert key
-  cert=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}' || true)
-  key=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'key: .+' | awk '{print $2}' || true)
+  local bin cert key
+  for candidate in /usr/local/x-ui/x-ui /opt/x-panel/x-ui; do
+    if [[ -x "$candidate" ]]; then bin="$candidate"; break; fi
+  done
+  [[ -z "${bin:-}" ]] && return 0
+  cert=$("$bin" setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}' || true)
+  key=$("$bin" setting -getCert true 2>/dev/null | grep -Eo 'key: .+' | awk '{print $2}' || true)
   if [[ -n "${cert:-}" && -n "${key:-}" && -f "$cert" && -f "$key" ]]; then
     echo "$cert|$key"
   fi
@@ -61,6 +65,12 @@ do_install() {
   local port="${1:-$DEFAULT_PORT}"
   install_pkg
 
+  # 发行版自带的 ttyd.service 会抢占同一端口（Debian/Ubuntu 默认 -i lo），先停掉
+  if systemctl list-unit-files 2>/dev/null | grep -q '^ttyd.service'; then
+    warn "检测到系统自带 ttyd.service，已停用以免抢占端口"
+    systemctl disable --now ttyd >/dev/null 2>&1 || true
+  fi
+
   local user pass
   user="admin"
   pass=$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 14)
@@ -69,7 +79,7 @@ do_install() {
   local pair; pair=$(panel_cert || true)
   if [[ -n "$pair" ]]; then
     local cert="${pair%%|*}" key="${pair##*|}"
-    tls_args="-s -C $cert -K $key"
+    tls_args="-S -C $cert -K $key"
     scheme="https"
   else
     warn "未找到面板证书，将以 HTTP 暴露（不建议公网使用）"
@@ -90,7 +100,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=$ENV_FILE
-ExecStart=/bin/sh -c 'exec \$(command -v ttyd) -p \$TTYD_PORT -i 0.0.0.0 -c \$TTYD_USER:\$TTYD_PASS $tls_args -W bash'
+ExecStart=/bin/sh -c 'exec \$(command -v ttyd) -p \$TTYD_PORT -c \$TTYD_USER:\$TTYD_PASS $tls_args -W bash'
 Restart=always
 RestartSec=3
 
@@ -104,8 +114,13 @@ EOF
 
   local ip
   ip=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
-  sleep 1
-  if systemctl is-active --quiet x-panel-ttyd; then
+  local state=""
+  for _ in $(seq 1 10); do
+    sleep 1
+    state=$(systemctl is-active x-panel-ttyd 2>/dev/null || true)
+    [[ "$state" == "active" ]] && break
+  done
+  if [[ "$state" == "active" ]]; then
     info "✅ 网页版 SSH 已启动"
     echo -e "   地址:   ${yellow}$scheme://$ip:$port${plain}"
     echo -e "   用户名: ${yellow}$user${plain}"

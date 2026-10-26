@@ -169,6 +169,41 @@
                       </a-table>
                     </a-card>
                   </a-tab-pane>
+                  <a-tab-pane key="7" :style="{ paddingTop: '20px' }">
+                    <template #tab>
+                      <a-icon type="cluster"></a-icon>
+                      <span>多面板</span>
+                    </template>
+                    <a-card size="small" title="本机作为被控端" style="margin-bottom: 12px">
+                      <div style="font-size: 12px; opacity: .75; margin-bottom: 8px">
+                        主控面板要用这个密钥才能管理本机。请像对待密码一样保管，泄露后请重新生成。
+                      </div>
+                      <a-input :value="slaveKey" readOnly>
+                        <a-button slot="addonAfter" size="small" icon="copy" @click="copyText(slaveKey)">复制</a-button>
+                      </a-input>
+                    </a-card>
+                    <a-card size="small" title="被控端列表">
+                      <a-space style="margin-bottom: 12px" wrap>
+                        <a-input v-model="newPanel.name" placeholder="名称，如 东京" style="width: 140px" />
+                        <a-input v-model="newPanel.url" placeholder="https://域名:端口/路径" style="width: 260px" />
+                        <a-input v-model="newPanel.key" placeholder="被控端 slaveKey" style="width: 240px" />
+                        <a-checkbox v-model="newPanel.insecure">自签证书/用 IP 访问</a-checkbox>
+                        <a-button type="primary" icon="plus" :loading="panelLoading" @click="addPanel">添加</a-button>
+                        <a-button icon="reload" @click="loadPanels">刷新</a-button>
+                      </a-space>
+                      <a-table :columns="panelColumns" :data-source="panels" size="small"
+                        :pagination="false" row-key="name" :locale="{ emptyText: '还没有添加被控端' }">
+                        <template slot="action" slot-scope="text, record">
+                          <a-space>
+                            <a-button type="link" size="small" @click="panelStatus(record.name)">状态</a-button>
+                            <a-popconfirm title="确定删除？" ok-text="删除" cancel-text="取消" @confirm="delPanel(record.name)">
+                              <a-button type="link" size="small" style="color: #ff4d4f">删除</a-button>
+                            </a-popconfirm>
+                          </a-space>
+                        </template>
+                      </a-table>
+                    </a-card>
+                  </a-tab-pane>
                 </a-tabs>
               </a-col>
             </a-row>
@@ -210,6 +245,16 @@
         { title: '大小', dataIndex: 'sizeText', key: 'sizeText', width: 110 },
         { title: '时间', dataIndex: 'timeText', key: 'timeText', width: 180 },
         { title: '操作', key: 'action', width: 90, scopedSlots: { customRender: 'action' } },
+      ],
+      // 【开源增强】多面板
+      panels: [],
+      panelLoading: false,
+      slaveKey: '',
+      newPanel: { name: '', url: '', key: '', insecure: false },
+      panelColumns: [
+        { title: '名称', dataIndex: 'name', key: 'name' },
+        { title: '地址', dataIndex: 'url', key: 'url' },
+        { title: '操作', key: 'action', width: 150, scopedSlots: { customRender: 'action' } },
       ],
       saveBtnDisable: true,
       user: {},
@@ -354,6 +399,62 @@
         } else {
           this.$message.error(msg.msg || '还原失败');
         }
+      },
+      // 【开源增强】多面板
+      async loadPanels() {
+        const msg = await HttpUtil.get('/panel/api/panels/list');
+        if (msg.success) {
+          this.panels = msg.obj.panels || [];
+          this.slaveKey = msg.obj.slaveKey || '';
+        } else {
+          this.$message.error(msg.msg || '读取失败');
+        }
+      },
+      async addPanel() {
+        const p = this.newPanel;
+        if (!p.name || !p.url || !p.key) {
+          this.$message.error('名称、地址、密钥都要填');
+          return;
+        }
+        this.panelLoading = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/panels/add', {
+            name: p.name, url: p.url, key: p.key, insecure: p.insecure,
+          });
+          if (msg.success) {
+            this.$message.success('已添加');
+            this.newPanel = { name: '', url: '', key: '', insecure: false };
+            await this.loadPanels();
+          } else {
+            this.$message.error(msg.msg || '添加失败');
+          }
+        } finally {
+          this.panelLoading = false;
+        }
+      },
+      async delPanel(name) {
+        const msg = await HttpUtil.post('/panel/api/panels/del', { name });
+        if (msg.success) {
+          this.$message.success('已删除');
+          await this.loadPanels();
+        } else {
+          this.$message.error(msg.msg || '删除失败');
+        }
+      },
+      async panelStatus(name) {
+        const msg = await HttpUtil.get('/panel/api/panels/status', { name });
+        if (msg.success && msg.obj) {
+          const o = msg.obj;
+          this.$message.info(`${name}：${o.hostname}｜v${o.version}｜Xray ${o.xrayRunning ? '运行中' : '已停止'}｜入站 ${o.inbounds}`);
+        } else {
+          this.$message.error((msg.msg || '离线') + '');
+        }
+      },
+      copyText(text) {
+        if (!text) return;
+        navigator.clipboard.writeText(text)
+          .then(() => this.$message.success('已复制'))
+          .catch(() => this.$message.error('复制失败，请手动选中'));
       },
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
@@ -669,8 +770,9 @@
       }
 
       await this.getAllSetting();
-      // 【开源增强】初始化数据快照列表
+      // 【开源增强】初始化数据快照与多面板列表
       this.loadBackups();
+      this.loadPanels();
 
       while (true) {
         await PromiseUtil.sleep(1000);

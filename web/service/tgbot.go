@@ -567,6 +567,22 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 			break
 		}
 		msg += t.WebSSHInfo()
+	case "panels":
+		// 【开源增强】多面板列表
+		onlyMessage = true
+		if !isAdmin {
+			handleUnknownCommand()
+			break
+		}
+		msg += t.PanelsSummary()
+	case "panel":
+		// 【开源增强】/panel <名称> status|links|restart
+		onlyMessage = true
+		if !isAdmin {
+			handleUnknownCommand()
+			break
+		}
+		msg += t.PanelCommand(commandArgs)
 	case "restart":
 		onlyMessage = true
 		if isAdmin {

@@ -71,6 +71,9 @@ var defaultValueMap = map[string]string{
 	"presenceEnable":        "true",
 	"presenceWindowMinutes": "10",
 	"presenceState":         "{}",
+	// 【开源增强】多面板主从
+	"slaveKey":     "",
+	"remotePanels": "[]",
 	"subJsonPath":                 "/json/",
 	"subJsonURI":                  "",
 	"subJsonFragment":             "",
