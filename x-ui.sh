@@ -2050,6 +2050,39 @@ show_usage() {
     echo -e "--------------------------------------------"
 }
 
+# 【开源增强】网页版 SSH（ttyd）：安装 / 查看 / 卸载
+webssh_menu() {
+    local script=""
+    local self_dir
+    self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
+    for candidate in "$self_dir/scripts/ttyd.sh" "/usr/local/x-ui/scripts/ttyd.sh" "/opt/x-panel/scripts/ttyd.sh"; do
+        if [[ -n "$candidate" && -f "$candidate" ]]; then script="$candidate"; break; fi
+    done
+    if [[ -z "$script" ]]; then
+        LOGE "未找到 scripts/ttyd.sh，请把仓库里的 scripts/ttyd.sh 一起放到面板目录后再试"
+        before_show_menu
+        return 0
+    fi
+
+    echo -e "——————————————————————
+  ${green}网页版 SSH（ttyd）${plain}
+——————————————————————
+  ${green}1.${plain} 安装并启动（默认 7681 端口）
+  ${green}2.${plain} 查看地址与账号
+  ${green}3.${plain} 卸载
+  ${green}0.${plain} 返回主菜单
+——————————————————————"
+    echo -n -e "${yellow}请选择：${plain}" && read -r webssh_choice
+    case "$webssh_choice" in
+        1) bash "$script" install ;;
+        2) bash "$script" status ;;
+        3) bash "$script" uninstall ;;
+        0) show_menu; return 0 ;;
+        *) LOGE "无效选项" ;;
+    esac
+    before_show_menu
+}
+
 show_menu() {
     echo -e "
 ——————————————————————
@@ -2088,6 +2121,7 @@ show_menu() {
   ${green}23.${plain} 更新 Geo 文件
   ${green}24.${plain} Speedtest by Ookla
   ${green}25.${plain} 安装订阅转换 
+  ${green}26.${plain} 网页版 SSH（ttyd）
 ——————————————————————
   ${green}若在使用过程中有任何问题${plain}
   ${yellow}请加入〔X-Panel面板〕交流群${plain}
@@ -2202,8 +2236,11 @@ ${green}9、RackNerd极致性价比机器：${yellow}https://my.racknerd.com/aff
     25)
         subconverter
         ;;
+    26)
+        webssh_menu
+        ;;
     *)
-        LOGE "请输入正确的数字选项 [0-25]"
+        LOGE "请输入正确的数字选项 [0-26]"
         ;;
     esac
 }

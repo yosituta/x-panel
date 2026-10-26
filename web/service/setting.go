@@ -67,6 +67,10 @@ var defaultValueMap = map[string]string{
 	"alertTrafficPercent":  "80",
 	"alertExpireDays":      "3",
 	"alertNotifyState":     "{}",
+	// 【开源增强】节点上下线通知
+	"presenceEnable":        "true",
+	"presenceWindowMinutes": "10",
+	"presenceState":         "{}",
 	"subJsonPath":                 "/json/",
 	"subJsonURI":                  "",
 	"subJsonFragment":             "",

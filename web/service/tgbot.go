@@ -547,6 +547,26 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 		} else {
 			handleUnknownCommand()
 		}
+	case "link", "links":
+		// 【开源增强】/link [关键字]：不用进面板，直接在 TG 里拿节点链接
+		onlyMessage = true
+		if !isAdmin {
+			handleUnknownCommand()
+			break
+		}
+		filter := ""
+		if len(commandArgs) > 0 {
+			filter = strings.Join(commandArgs, " ")
+		}
+		msg += t.buildNodeLinks(filter)
+	case "webssh":
+		// 【开源增强】查看网页版 SSH 的地址与账号
+		onlyMessage = true
+		if !isAdmin {
+			handleUnknownCommand()
+			break
+		}
+		msg += t.WebSSHInfo()
 	case "restart":
 		onlyMessage = true
 		if isAdmin {
@@ -4312,4 +4332,49 @@ func (t *Tgbot) SendStickerToTgbot(chatId int64, fileId string) (*telego.Message
 	
 	// 成功返回 *telego.Message 对象
 	return msg, nil
+}
+
+// 【开源增强】拼装节点链接文本，供 /link 命令使用
+func (t *Tgbot) buildNodeLinks(filter string) string {
+	var subSubscribe SubscribeService
+	host := t.ResolveLinkHost()
+	nodes, err := subSubscribe.AllNodes(host)
+	if err != nil {
+		return "读取节点失败：" + err.Error()
+	}
+	kw := strings.ToLower(strings.TrimSpace(filter))
+	var b strings.Builder
+	matched := 0
+	for _, n := range nodes {
+		if kw != "" && !strings.Contains(strings.ToLower(n.Remark), kw) {
+			continue
+		}
+		matched++
+		b.WriteString("【" + n.Remark + "】\r\n" + n.URI() + "\r\n\r\n")
+	}
+	if matched == 0 {
+		if kw == "" {
+			return "还没有可用的节点"
+		}
+		return "没有匹配「" + filter + "」的节点"
+	}
+	return fmt.Sprintf("🔗 节点链接（%d 条，地址 %s）\r\n\r\n%s", matched, host, b.String())
+}
+
+// ResolveLinkHost 决定链接里使用的地址：
+// 订阅域名 → 面板证书目录名（install.sh 按域名建目录）→ 机器名 → 本地回环
+func (t *Tgbot) ResolveLinkHost() string {
+	var ss SettingService
+	if v, err := ss.getString("subDomain"); err == nil && strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v)
+	}
+	if cert, err := ss.GetCertFile(); err == nil && cert != "" {
+		if name := filepath.Base(filepath.Dir(cert)); strings.Contains(name, ".") && len(name) > 3 {
+			return name
+		}
+	}
+	if hostname != "" && strings.Contains(hostname, ".") {
+		return hostname
+	}
+	return "127.0.0.1"
 }

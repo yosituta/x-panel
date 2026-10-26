@@ -2,10 +2,12 @@ package controller
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os/exec"
 	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"x-ui/web/global"
@@ -35,7 +37,7 @@ func NewServerController(g *gin.RouterGroup, serverService service.ServerService
 		lastGetStatusTime: time.Now(),
 		// 〔中文注释〕: 2. 将传入的 serverService 赋值给 a.serverService。
 		//    这样一来，这个 Controller 内部使用的就是我们在 main.go 中创建的那个功能完整的服务了。
-		serverService:  serverService,
+		serverService: serverService,
 	}
 	a.initRouter(g)
 	a.startTask()
@@ -60,6 +62,9 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/backup", a.backupNow)
 	g.GET("/backups", a.backupList)
 	g.POST("/restore/:name", a.restoreBackup)
+	// 【开源增强】TG /link 命令的调试入口 + 上下线通知手动触发
+	g.GET("/nodeLinks", a.nodeLinks)
+	g.POST("/checkPresence", a.checkPresence)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -356,19 +361,18 @@ func (a *ServerController) loadHistory(c *gin.Context) {
 	jsonObj(c, history, nil)
 }
 
-
 // 〔新增接口〕: 安装 Subconverter
 // 〔中文注释〕: 这个函数是暴露给前端的 API 接口，用于处理安装 Subconverter 的请求。
 func (a *ServerController) installSubconverter(c *gin.Context) {
-    // 〔中文注释〕: 调用服务层中我们刚刚创建的 InstallSubconverter 方法。
-    err := a.serverService.InstallSubconverter()
-    if err != nil {
-        // 〔中文注释〕: 如果 service 层返回了错误，则向前台返回失败的 JSON 消息。
-        jsonMsg(c, "Subconverter 安装指令执行失败", err)
-        return
-    }
-    // 〔中文注释〕: 如果没有错误，则向前台返回成功的 JSON 消息。
-    jsonMsg(c, "Subconverter 安装指令已成功发送", nil)
+	// 〔中文注释〕: 调用服务层中我们刚刚创建的 InstallSubconverter 方法。
+	err := a.serverService.InstallSubconverter()
+	if err != nil {
+		// 〔中文注释〕: 如果 service 层返回了错误，则向前台返回失败的 JSON 消息。
+		jsonMsg(c, "Subconverter 安装指令执行失败", err)
+		return
+	}
+	// 〔中文注释〕: 如果没有错误，则向前台返回成功的 JSON 消息。
+	jsonMsg(c, "Subconverter 安装指令已成功发送", nil)
 }
 
 // 【新增接口实现】: 前端放行端口
@@ -446,4 +450,45 @@ func schedulePanelRestart() {
 	if err := cmd.Start(); err != nil {
 		fmt.Println("安排重启失败:", err)
 	}
+}
+
+// 【开源增强】返回全部节点链接文本（与 TG /link 命令同一份实现）
+func (a *ServerController) nodeLinks(c *gin.Context) {
+	var sub service.SubscribeService
+	var tg service.Tgbot
+	host := c.Query("host")
+	if host == "" {
+		host = c.Request.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+	}
+	if host == "" {
+		host = tg.ResolveLinkHost()
+	}
+	nodes, err := sub.AllNodes(host)
+	if err != nil {
+		jsonMsg(c, "读取节点失败", err)
+		return
+	}
+	filter := c.Query("filter")
+	lines := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		if filter != "" && !strings.Contains(n.Remark, filter) {
+			continue
+		}
+		lines = append(lines, "【"+n.Remark+"】\r\n"+n.URI())
+	}
+	jsonObj(c, gin.H{"count": len(lines), "text": strings.Join(lines, "\r\n\r\n")}, nil)
+}
+
+// 【开源增强】手动触发一次上下线检查
+func (a *ServerController) checkPresence(c *gin.Context) {
+	var svc service.PresenceService
+	count, err := svc.CheckAndNotify()
+	if err != nil {
+		jsonMsg(c, "上下线检查失败", err)
+		return
+	}
+	jsonObj(c, gin.H{"count": count}, nil)
 }
