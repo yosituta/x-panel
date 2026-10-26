@@ -361,6 +361,11 @@
 "descriptionTitle" = "\r\n\r\nUsage notes"
 "descriptionContent" = "1.This function will automatically generate inbound connections for the VLESS + TCP + Reality (xtls-rprx-vision) and VLESS + XHTTP + Reality protocols. The first two combinations are suitable for direct connections.\r\n2.Or for VLESS Encryption + XHTTP + TLS (with optional CDN) protocols.\r\n3.And randomly assign an available port. Please ensure that this port is open. After generating, please copy the [Link Address] directly.\r\n4.The [One-Click Configuration] generation function here is connected to the [Inbound] data.\r\n5.After one-click creation, you can manually view/copy or edit the details in the list to add other parameters."
 
+"pickTip" = "Pick a protocol — one click generates a ready-to-use inbound (port assigned automatically)"
+"opt1Desc" = "Recommended · no domain or certificate needed"
+"opt2Desc" = "Needs a certificate configured in the panel · best compatibility"
+"opt3Desc" = "Needs a certificate configured in the panel · good as a fallback"
+"advancedOptions" = "Advanced (count / port / remark / traffic / camouflage domain)"
 [pages.inbounds.oneClick.preset]
 "vless_reality" = "VLESS + TCP + Reality + Vision"
 "vless_xhttp_reality" = "VLESS + XHTTP + Reality"

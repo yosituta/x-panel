@@ -8,6 +8,38 @@
 
 ---
 
+## 一键配置简化 + 固定 Xray 内核（2026-10-26）
+
+### 修复：Reality 节点在 iOS Shadowrocket 上握手失败
+
+现象：本分支打包的最新 Xray（26.10.21）生成的 Reality 节点，iPhone 上「延迟测试通过、但一个字节都传不出去」，服务端日志为：
+
+```
+REALITY: processed invalid connection from x.x.x.x: authentication failed or validation criteria not met
+```
+
+排查方式：在同一台服务器上换内核做 A/B 实测（配置完全不变）：
+
+| Xray 内核 | Shadowrocket 实测 |
+| --- | --- |
+| 26.10.21 | ❌ 认证失败 |
+| 25.9.11 | ✅ 正常出网 |
+| 26.9.9 | 见下方说明 |
+
+结论：问题在内核版本，不在 Reality 参数。实测 `target` / `dest`、单域名 / 双 serverNames、2 位 / 8 位 shortId 三种写法在可用内核上都能通，因此代码无需改参数。
+
+修复：`.github/workflows/release.yml` 不再取 `releases/latest`，改为固定 `XRAY_VERSION`（与上游一致）。升级该版本号前必须用 iOS 实测。
+
+### 变更：一键配置改为三选一
+
+原来的「预设下拉 + 7 个高级选项 + 数量/端口/备注/流量/域名」全部收起，主界面只剩三个按钮，点一下即生成一条节点并直接弹出二维码：
+
+1. VLESS + TCP + Reality + Vision（推荐，无需域名和证书）
+2. VLESS + TCP + TLS（需面板已配置证书）
+3. Trojan + TCP + TLS（需面板已配置证书）
+
+数量、起始端口、备注前缀、流量、偷用域名等仍在「高级选项」折叠面板中，批量生成走原来的逻辑。
+
 ## v1.0.0（2026-10-26）
 
 首个完整版本：上游公开的 22 项技术类 Pro 功能全部重新实现，另加 9 项自研能力。

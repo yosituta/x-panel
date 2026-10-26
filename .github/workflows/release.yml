@@ -51,17 +51,22 @@ jobs:
         run: |
           go build -trimpath -ldflags "-s -w" -o x-ui .
 
-      - name: 下载 Xray-core
+      - name: 下载 Xray-core（固定版本）
+        env:
+          # 固定内核版本，不跟随 latest。
+          # 原因：Reality 握手在部分客户端（如 iOS Shadowrocket）上对内核版本敏感，
+          # 26.10.x 服务端会出现 "REALITY: authentication failed"，25.9.11 / 26.9.9 正常。
+          # 升级此版本号前，必须用 iPhone + Shadowrocket 实测 Reality 节点能否出网。
+          XRAY_VERSION: v26.9.9
         run: |
           set -e
-          url=$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest \
-                | grep -oE '"browser_download_url": *"[^"]*${{ matrix.xray_asset }}"' \
-                | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+          url="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${{ matrix.xray_asset }}"
           echo "xray: $url"
           curl -fsSL -o xray.zip "$url"
           mkdir -p xraydl
           unzip -o -q xray.zip -d xraydl
           chmod +x xraydl/xray
+          echo "version: $(xraydl/xray version | head -1)"
 
       - name: 打包
         run: |

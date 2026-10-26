@@ -8,6 +8,37 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Simpler one-click setup + pinned Xray core (2026-10-26)
+
+### Fix: Reality handshake failing on iOS Shadowrocket
+
+Symptom: Reality inbounds created by this fork's bundled Xray (26.10.21) connect from iPhone but transfer nothing, while the server log shows:
+
+```
+REALITY: processed invalid connection from x.x.x.x: authentication failed or validation criteria not met
+```
+
+Method: A/B test on the same server, changing only the core:
+
+| Xray core | Shadowrocket result |
+| --- | --- |
+| 26.10.21 | failed |
+| 25.9.11 | works |
+
+Conclusion: the core version is the cause, not the Reality parameters. With a working core, all three variants (`target` / `dest`, single vs. double `serverNames`, 2-char vs. 8-char `shortId`) connect fine, so no parameter changes were needed.
+
+Fix: `.github/workflows/release.yml` no longer resolves `releases/latest`; it pins `XRAY_VERSION` (matching upstream). Bump it only after testing Reality from an iPhone.
+
+### Change: one-click setup reduced to three choices
+
+The preset dropdown and the seven advanced fields are gone from the main dialog. Three buttons remain; one click creates a single inbound and opens its QR code immediately:
+
+1. VLESS + TCP + Reality + Vision (recommended, no domain or certificate)
+2. VLESS + TCP + TLS (requires a certificate in the panel)
+3. Trojan + TCP + TLS (requires a certificate in the panel)
+
+Count, start port, remark prefix, traffic quota and camouflage domain stay under an "Advanced" collapse for batch creation.
+
 ## v1.0.0 (2026-10-26)
 
 First complete release: all 22 technical features described in the public upstream README are re-implemented, plus 9 features of our own.

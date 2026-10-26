@@ -758,83 +758,99 @@
       :footer="null"
       :width="760"
    >
-      <a-alert type="info" show-icon
-        :message="`{{ i18n "pages.inbounds.oneClick.tip" }}`"
-        style="margin-bottom: 16px">
-      </a-alert>
+      <div style="font-size: 13px; opacity: .8; margin-bottom: 14px">
+        {{ i18n "pages.inbounds.oneClick.pickTip" }}
+      </div>
 
-      <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
-        <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.presetLabel" }}`">
-          <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
-            <a-select-option value="auto">{{ i18n "pages.inbounds.oneClick.presetAuto" }}</a-select-option>
-            <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
-            <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetTrojan" }}</a-select-option>
-            <template v-if="oneClickAdvanced">
-              <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
-              <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
-              <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
-              <a-select-option value="reality-legacy">{{ i18n "pages.inbounds.oneClick.presetRealityLegacy" }}</a-select-option>
-            </template>
-          </a-select>
-          <div style="margin-top: 6px">
-            <a-checkbox v-model="oneClickAdvanced">
-              {{ i18n "pages.inbounds.oneClick.advancedToggle" }}
-            </a-checkbox>
-          </div>
-        </a-form-item>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.count" }}`">
-              <a-input-number v-model.number="oneClickForm.count" :min="1" :max="50" style="width: 100%"></a-input-number>
+      <a-button block size="large" class="one-click-opt" style="margin-bottom: 10px; height: auto; padding: 10px 14px; text-align: left"
+        :loading="oneClickLoading && oneClickPending === 'reality'" @click="oneClickPreset('reality')">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+          <span style="font-size: 14px">1&nbsp;&nbsp;VLESS + TCP + Reality + Vision</span>
+          <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt1Desc" }}</span>
+        </div>
+      </a-button>
+
+      <a-button block size="large" class="one-click-opt" style="margin-bottom: 10px; height: auto; padding: 10px 14px; text-align: left"
+        :loading="oneClickLoading && oneClickPending === 'tls'" @click="oneClickPreset('tls')">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+          <span style="font-size: 14px">2&nbsp;&nbsp;VLESS + TCP + TLS</span>
+          <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt2Desc" }}</span>
+        </div>
+      </a-button>
+
+      <a-button block size="large" class="one-click-opt" style="height: auto; padding: 10px 14px; text-align: left"
+        :loading="oneClickLoading && oneClickPending === 'trojan'" @click="oneClickPreset('trojan')">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+          <span style="font-size: 14px">3&nbsp;&nbsp;Trojan + TCP + TLS</span>
+          <span style="font-size: 12px; opacity: .6">{{ i18n "pages.inbounds.oneClick.opt3Desc" }}</span>
+        </div>
+      </a-button>
+
+      <a-collapse style="margin-top: 16px">
+        <a-collapse-panel key="adv" :header="`{{ i18n "pages.inbounds.oneClick.advancedOptions" }}`">
+          <a-form :colon="false" :label-col="{ md: {span: 7} }" :wrapper-col="{ md: {span: 15} }">
+            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.presetLabel" }}`">
+              <a-select v-model="oneClickForm.preset" :dropdown-class-name="themeSwitcher.currentTheme">
+                <a-select-option value="auto">{{ i18n "pages.inbounds.oneClick.presetAuto" }}</a-select-option>
+                <a-select-option value="tls">{{ i18n "pages.inbounds.oneClick.presetTls" }}</a-select-option>
+                <a-select-option value="trojan">{{ i18n "pages.inbounds.oneClick.presetTrojan" }}</a-select-option>
+                <a-select-option value="reality">{{ i18n "pages.inbounds.oneClick.presetReality" }}</a-select-option>
+                <a-select-option value="reality-novision">{{ i18n "pages.inbounds.oneClick.presetRealityNoVision" }}</a-select-option>
+                <a-select-option value="reality-udp443">{{ i18n "pages.inbounds.oneClick.presetRealityUDP443" }}</a-select-option>
+                <a-select-option value="reality-legacy">{{ i18n "pages.inbounds.oneClick.presetRealityLegacy" }}</a-select-option>
+              </a-select>
             </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.startPort" }}`">
-              <a-input-number v-model.number="oneClickForm.startPort" :min="0" :max="65535" style="width: 100%"
-                :placeholder="`{{ i18n "pages.inbounds.oneClick.startPortPlaceholder" }}`"></a-input-number>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.count" }}`">
+                  <a-input-number v-model.number="oneClickForm.count" :min="1" :max="50" style="width: 100%"></a-input-number>
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.startPort" }}`">
+                  <a-input-number v-model.number="oneClickForm.startPort" :min="0" :max="65535" style="width: 100%"
+                    :placeholder="`{{ i18n "pages.inbounds.oneClick.startPortPlaceholder" }}`"></a-input-number>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="16">
+              <a-col :span="12">
+                <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.prefix" }}`">
+                  <a-input v-model.trim="oneClickForm.remarkPrefix"
+                    :placeholder="`{{ i18n "pages.inbounds.oneClick.prefixPlaceholder" }}`"></a-input>
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.totalGB" }}`">
+                  <a-input-number v-model.number="oneClickForm.totalGB" :min="0" style="width: 100%"></a-input-number>
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.domain" }}`">
+              <a-input v-model.trim="oneClickForm.domain"
+                :placeholder="`{{ i18n "pages.inbounds.oneClick.domainPlaceholder" }}`">
+                <a-button slot="addonAfter" size="small" icon="shuffle" :loading="oneClickDomainLoading"
+                  v-if="oneClickForm.preset === 'reality' || oneClickForm.preset === 'reality-novision' || oneClickForm.preset === 'reality-legacy'"
+                  @click="pickRealityDomain">{{ i18n "pages.inbounds.oneClick.pickDomain" }}</a-button>
+              </a-input>
+              <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'tls' || oneClickForm.preset === 'trojan'">
+                {{ i18n "pages.inbounds.oneClick.certHint" }}
+              </div>
+              <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'auto'">
+                {{ i18n "pages.inbounds.oneClick.autoHint" }}
+              </div>
             </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.prefix" }}`">
-              <a-input v-model.trim="oneClickForm.remarkPrefix"
-                :placeholder="`{{ i18n "pages.inbounds.oneClick.prefixPlaceholder" }}`"></a-input>
+            <a-form-item :wrapper-col="{ md: {span: 15, offset: 7} }">
+              <a-space>
+                <a-button type="primary" icon="thunderbolt" :loading="oneClickLoading" @click="deployRealityBatch">
+                  {{ i18n "pages.inbounds.oneClick.deploy" }}
+                </a-button>
+                <a-button @click="resetOneClickForm">{{ i18n "reset" }}</a-button>
+              </a-space>
             </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.totalGB" }}`">
-              <a-input-number v-model.number="oneClickForm.totalGB" :min="0" style="width: 100%"></a-input-number>
-            </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-form-item :label="`{{ i18n "pages.inbounds.oneClick.domain" }}`">
-          <a-input v-model.trim="oneClickForm.domain"
-            :placeholder="`{{ i18n "pages.inbounds.oneClick.domainPlaceholder" }}`">
-            <a-button slot="addonAfter" size="small" icon="shuffle" :loading="oneClickDomainLoading"
-              v-if="oneClickForm.preset === 'reality' || oneClickForm.preset === 'reality-novision'"
-              @click="pickRealityDomain">{{ i18n "pages.inbounds.oneClick.pickDomain" }}</a-button>
-          </a-input>
-          <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'tls' || oneClickForm.preset === 'trojan'">
-            {{ i18n "pages.inbounds.oneClick.certHint" }}
-          </div>
-          <div style="font-size: 12px; opacity: .65; margin-top: 4px" v-if="oneClickForm.preset === 'auto'">
-            {{ i18n "pages.inbounds.oneClick.autoHint" }}
-          </div>
-        </a-form-item>
-
-        <a-form-item :wrapper-col="{ md: {span: 15, offset: 7} }">
-          <a-space>
-            <a-button type="primary" icon="thunderbolt" :loading="oneClickLoading" @click="deployRealityBatch">
-              {{ i18n "pages.inbounds.oneClick.deploy" }}
-            </a-button>
-            <a-button @click="resetOneClickForm">{{ i18n "reset" }}</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-
+          </a-form>
+        </a-collapse-panel>
+      </a-collapse>
       <template v-if="oneClickResult">
         <a-divider style="margin: 8px 0"></a-divider>
         <a-alert v-if="oneClickResult.created && oneClickResult.created.length" type="success" show-icon
@@ -1024,6 +1040,8 @@
             oneClickModalVisible: false,
             // 【开源增强】批量部署节点表单
             oneClickLoading: false,
+            // 【一键配置】正在生成哪个预设（用于按钮 loading）
+            oneClickPending: null,
             // 【开源增强】是否显示 Reality 等高级预设（默认隐藏，避免误选到不兼容的协议）
             oneClickAdvanced: false,
             oneClickDomainLoading: false,
@@ -1302,6 +1320,19 @@ async openPort(port) {
                 }
             },
 
+            // 【一键配置】点一下直接生成一条可用节点，无需任何参数
+            async oneClickPreset(preset) {
+                this.oneClickForm.preset = preset;
+                this.oneClickForm.count = 1;
+                this.oneClickForm.startPort = 0;
+                this.oneClickPending = preset;
+                try {
+                    await this.deployRealityBatch();
+                } finally {
+                    this.oneClickPending = null;
+                }
+            },
+
             // 【开源增强】批量部署 N 条 VLESS + TCP + Reality + Vision 节点
             async deployRealityBatch() {
                 const form = this.oneClickForm;
@@ -1332,6 +1363,14 @@ async openPort(port) {
                     if (created > 0) {
                         this.$message.success(`已创建 ${created} 条节点` + (failed ? `，${failed} 条失败` : ''));
                         await this.getDBInbounds();
+                        // 【一键配置】只生成一条时，直接弹出二维码，省掉一次点击
+                        if (created === 1 && !failed) {
+                            const item = (msg.obj.created || [])[0] || {};
+                            this.oneClickModalVisible = false;
+                            if (item.id) {
+                                this.$nextTick(() => this.showQrcode(item.id));
+                            }
+                        }
                     } else {
                         this.$message.error('没有创建成功任何节点');
                     }
