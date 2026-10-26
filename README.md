@@ -1,5 +1,7 @@
 # X-Panel 开源增强版
 
+[简体中文](README.md) · **[English](README.en.md)**
+
 基于 [xeefei/X-Panel](https://github.com/xeefei/X-Panel) 的 **GPLv3 开源分支**。上游把「一键配置」等实用功能移入付费 Pro 版并停止向免费版更新，本分支按公开功能说明重新实现，并补上了作者自己需要的运维能力。
 
 - 面板本体：Go + Gin + SQLite，Xray-core 作为子进程托管
