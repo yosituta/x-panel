@@ -204,6 +204,62 @@
                       </a-table>
                     </a-card>
                   </a-tab-pane>
+                  <a-tab-pane key="8" :style="{ paddingTop: '20px' }">
+                    <template #tab>
+                      <a-icon type="schedule"></a-icon>
+                      <span>定时报告</span>
+                    </template>
+                    <a-card size="small">
+                      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 14 }" :colon="false">
+                        <a-form-item label="启用">
+                          <a-switch v-model="report.enable" />
+                          <span style="margin-left: 8px; font-size: 12px; opacity: .65">发送到 Telegram 管理员</span>
+                        </a-form-item>
+                        <a-form-item label="频率">
+                          <a-radio-group v-model="report.interval" button-style="solid">
+                            <a-radio-button value="daily">每天</a-radio-button>
+                            <a-radio-button value="weekly">每周</a-radio-button>
+                            <a-radio-button value="monthly">每月</a-radio-button>
+                          </a-radio-group>
+                        </a-form-item>
+                        <a-form-item label="发送时间">
+                          <a-input v-model="report.time" style="width: 120px" placeholder="09:00" />
+                          <span style="margin-left: 8px; font-size: 12px; opacity: .65">24 小时制，精确到分钟</span>
+                        </a-form-item>
+                        <a-form-item label="星期几" v-if="report.interval === 'weekly'">
+                          <a-select v-model="report.weekday" style="width: 120px">
+                            <a-select-option :value="1">周一</a-select-option>
+                            <a-select-option :value="2">周二</a-select-option>
+                            <a-select-option :value="3">周三</a-select-option>
+                            <a-select-option :value="4">周四</a-select-option>
+                            <a-select-option :value="5">周五</a-select-option>
+                            <a-select-option :value="6">周六</a-select-option>
+                            <a-select-option :value="7">周日</a-select-option>
+                          </a-select>
+                        </a-form-item>
+                        <a-form-item label="每月几号" v-if="report.interval === 'monthly'">
+                          <a-input-number v-model="report.day" :min="1" :max="31" style="width: 120px" />
+                        </a-form-item>
+                        <a-form-item label="报告内容">
+                          <a-checkbox-group v-model="report.content">
+                            <a-checkbox value="server">服务器状态</a-checkbox>
+                            <a-checkbox value="traffic">流量与用量前五</a-checkbox>
+                            <a-checkbox value="inbounds">入站与到期</a-checkbox>
+                            <a-checkbox value="clients">在线客户端</a-checkbox>
+                          </a-checkbox-group>
+                        </a-form-item>
+                        <a-form-item :wrapper-col="{ span: 14, offset: 6 }">
+                          <a-space>
+                            <a-button type="primary" @click="saveReport">保存</a-button>
+                            <a-button @click="previewReport">预览</a-button>
+                            <a-button :disabled="!report.enable" @click="sendReport">立即发送一次</a-button>
+                          </a-space>
+                        </a-form-item>
+                      </a-form>
+                      <a-textarea v-if="reportPreviewText" v-model="reportPreviewText" readonly
+                        :auto-size="{ minRows: 8, maxRows: 20 }" style="margin-top: 12px; font-family: monospace" />
+                    </a-card>
+                  </a-tab-pane>
                 </a-tabs>
               </a-col>
             </a-row>
@@ -256,6 +312,9 @@
         { title: '地址', dataIndex: 'url', key: 'url' },
         { title: '操作', key: 'action', width: 150, scopedSlots: { customRender: 'action' } },
       ],
+      // 【开源增强】定时报告
+      report: { enable: false, interval: 'daily', time: '09:00', weekday: 1, day: 1, content: ['server', 'traffic', 'inbounds'] },
+      reportPreviewText: '',
       saveBtnDisable: true,
       user: {},
       lang: LanguageManager.getLanguage(),
@@ -455,6 +514,40 @@
         navigator.clipboard.writeText(text)
           .then(() => this.$message.success('已复制'))
           .catch(() => this.$message.error('复制失败，请手动选中'));
+      },
+      // 【开源增强】定时报告
+      async loadReport() {
+        const msg = await HttpUtil.get('/panel/api/server/reportPreview');
+        if (msg.success && msg.obj && msg.obj.config) {
+          try {
+            const c = JSON.parse(msg.obj.config);
+            this.report = {
+              enable: !!c.Enable, interval: c.Interval || 'daily',
+              time: c.Time || '09:00', weekday: c.Weekday || 1,
+              day: c.Day || 1, content: c.Content || ['server', 'traffic', 'inbounds'],
+            };
+          } catch (e) { /* 保持默认 */ }
+        }
+      },
+      async saveReport() {
+        const msg = await HttpUtil.post('/panel/api/server/reportConfig', {
+          enable: this.report.enable, interval: this.report.interval,
+          time: this.report.time, weekday: this.report.weekday,
+          day: this.report.day, content: this.report.content,
+        });
+        msg.success ? this.$message.success('报告配置已保存') : this.$message.error(msg.msg || '保存失败');
+      },
+      async previewReport() {
+        const msg = await HttpUtil.get('/panel/api/server/reportPreview');
+        if (msg.success) {
+          this.reportPreviewText = msg.obj.text || '';
+        } else {
+          this.$message.error(msg.msg || '预览失败');
+        }
+      },
+      async sendReport() {
+        const msg = await HttpUtil.post('/panel/api/server/reportSend', {});
+        msg.success ? this.$message.success('已发送（若未配置 Telegram 机器人，只会写入日志）') : this.$message.error(msg.msg || '发送失败');
       },
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
@@ -773,6 +866,7 @@
       // 【开源增强】初始化数据快照与多面板列表
       this.loadBackups();
       this.loadPanels();
+      this.loadReport();
 
       while (true) {
         await PromiseUtil.sleep(1000);

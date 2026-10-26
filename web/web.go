@@ -334,6 +334,8 @@ func (s *Server) startTask() {
 	s.cron.AddJob("@every 10m", job.NewAlertJob())
 	// 【开源增强】每 5 分钟检查节点上下线，变化时推送 TG
 	s.cron.AddJob("@every 5m", job.NewPresenceJob())
+	// 【开源增强】每分钟检查定时报告是否到点
+	s.cron.AddJob("@every 1m", job.NewReportJob())
 
 	// check client ips from log file every day
 	s.cron.AddJob("@daily", job.NewClearLogsJob())

@@ -74,6 +74,14 @@ var defaultValueMap = map[string]string{
 	// 【开源增强】多面板主从
 	"slaveKey":     "",
 	"remotePanels": "[]",
+	// 【开源增强】定时报告
+	"reportEnable":   "false",
+	"reportInterval": "daily",
+	"reportTime":     "09:00",
+	"reportWeekday":  "1",
+	"reportDay":      "1",
+	"reportContent":  "server,traffic,inbounds",
+	"reportLastSent": "",
 	"subJsonPath":                 "/json/",
 	"subJsonURI":                  "",
 	"subJsonFragment":             "",
@@ -190,6 +198,11 @@ func (s *SettingService) getSetting(key string) (*model.Setting, error) {
 		return nil, err
 	}
 	return setting, nil
+}
+
+// SaveSetting 供控制器等外部包保存任意设置项
+func (s *SettingService) SaveSetting(key string, value string) error {
+	return s.saveSetting(key, value)
 }
 
 func (s *SettingService) saveSetting(key string, value string) error {

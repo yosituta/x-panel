@@ -48,6 +48,10 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 	g.POST("/updateClientTraffic/:email", a.updateClientTraffic)
 	// 【开源增强】一键批量部署 VLESS + TCP + Reality + Vision 节点
 	g.POST("/batchDeployReality", a.batchDeployReality)
+	// 【开源增强】一键中转节点
+	g.POST("/relay", a.createRelay)
+	g.DELETE("/relay/:port", a.removeRelay)
+	g.POST("/relay/remove/:port", a.removeRelay)
 }
 
 func (a *InboundController) getInbounds(c *gin.Context) {
@@ -405,4 +409,37 @@ func (a *InboundController) updateClientTraffic(c *gin.Context) {
 	}
 
 	jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundClientUpdateSuccess"), nil)
+}
+
+// 【开源增强】一键中转节点：本机入口 → 远程 Socks5/HTTP → 出网
+func (a *InboundController) createRelay(c *gin.Context) {
+	var opts service.RelayOptions
+	if err := c.ShouldBindJSON(&opts); err != nil {
+		jsonMsg(c, "参数错误", err)
+		return
+	}
+	var svc service.RelayService
+	inbound, link, err := svc.Create(&opts)
+	if err != nil {
+		jsonMsg(c, "创建中转节点失败", err)
+		return
+	}
+	jsonObj(c, gin.H{"inbound": inbound, "link": link}, nil)
+	a.xrayService.SetToNeedRestart()
+}
+
+// 【开源增强】删除中转节点（连带清掉 xray 模板里的 outbound 与路由规则）
+func (a *InboundController) removeRelay(c *gin.Context) {
+	port, err := strconv.Atoi(c.Param("port"))
+	if err != nil {
+		jsonMsg(c, "端口不合法", err)
+		return
+	}
+	var svc service.RelayService
+	if err := svc.Remove(port); err != nil {
+		jsonMsg(c, "删除中转节点失败", err)
+		return
+	}
+	jsonObj(c, gin.H{"removed": port}, nil)
+	a.xrayService.SetToNeedRestart()
 }

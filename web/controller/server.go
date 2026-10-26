@@ -65,6 +65,10 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	// 【开源增强】TG /link 命令的调试入口 + 上下线通知手动触发
 	g.GET("/nodeLinks", a.nodeLinks)
 	g.POST("/checkPresence", a.checkPresence)
+	// 【开源增强】定时报告：预览 / 立即发送 / 保存配置
+	g.GET("/reportPreview", a.reportPreview)
+	g.POST("/reportSend", a.reportSend)
+	g.POST("/reportConfig", a.reportConfig)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -491,4 +495,53 @@ func (a *ServerController) checkPresence(c *gin.Context) {
 		return
 	}
 	jsonObj(c, gin.H{"count": count}, nil)
+}
+
+// 【开源增强】预览定时报告正文
+func (a *ServerController) reportPreview(c *gin.Context) {
+	var svc service.ReportService
+	jsonObj(c, gin.H{"text": svc.PreviewReport(), "config": svc.ConfigJSON()}, nil)
+}
+
+// 【开源增强】立即发送一次报告（便于验证 TG 通道）
+func (a *ServerController) reportSend(c *gin.Context) {
+	var svc service.ReportService
+	var tg service.Tgbot
+	tg.SendMsgToTgbotAdmins(svc.PreviewReport())
+	jsonObj(c, gin.H{"sent": true}, nil)
+}
+
+// 【开源增强】保存报告配置
+func (a *ServerController) reportConfig(c *gin.Context) {
+	var body struct {
+		Enable   bool     `json:"enable"`
+		Interval string   `json:"interval"`
+		Time     string   `json:"time"`
+		Weekday  int      `json:"weekday"`
+		Day      int      `json:"day"`
+		Content  []string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		jsonMsg(c, "参数错误", err)
+		return
+	}
+	var ss service.SettingService
+	set := func(k, v string) error { return ss.SaveSetting(k, v) }
+	_ = set("reportEnable", fmt.Sprintf("%t", body.Enable))
+	if body.Interval != "" {
+		_ = set("reportInterval", body.Interval)
+	}
+	if body.Time != "" {
+		_ = set("reportTime", body.Time)
+	}
+	if body.Weekday >= 1 && body.Weekday <= 7 {
+		_ = set("reportWeekday", fmt.Sprintf("%d", body.Weekday))
+	}
+	if body.Day >= 1 && body.Day <= 31 {
+		_ = set("reportDay", fmt.Sprintf("%d", body.Day))
+	}
+	if len(body.Content) > 0 {
+		_ = set("reportContent", strings.Join(body.Content, ","))
+	}
+	jsonObj(c, gin.H{"saved": true}, nil)
 }

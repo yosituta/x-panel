@@ -2051,6 +2051,23 @@ show_usage() {
 }
 
 # 【开源增强】网页版 SSH（ttyd）：安装 / 查看 / 卸载
+# 【开源增强】定位并执行仓库 scripts/ 下的脚本
+run_repo_script() {
+    local name="$1"; shift
+    local self_dir script=""
+    self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
+    for candidate in "$self_dir/scripts/$name" "/usr/local/x-ui/scripts/$name" "/opt/x-panel/scripts/$name"; do
+        if [[ -n "$candidate" && -f "$candidate" ]]; then script="$candidate"; break; fi
+    done
+    if [[ -z "$script" ]]; then
+        LOGE "未找到 scripts/$name，请把仓库的 scripts 目录一起放好"
+        before_show_menu
+        return 0
+    fi
+    bash "$script" "$@"
+    before_show_menu
+}
+
 webssh_menu() {
     local script=""
     local self_dir
@@ -2122,6 +2139,9 @@ show_menu() {
   ${green}24.${plain} Speedtest by Ookla
   ${green}25.${plain} 安装订阅转换 
   ${green}26.${plain} 网页版 SSH（ttyd）
+  ${green}27.${plain} 线路/IP 质量检测
+  ${green}28.${plain} 地区 DNS 检测
+  ${green}29.${plain} 深度调优（BBR/FQ/TFO）
 ——————————————————————
   ${green}若在使用过程中有任何问题${plain}
   ${yellow}请加入〔X-Panel面板〕交流群${plain}
@@ -2239,8 +2259,26 @@ ${green}9、RackNerd极致性价比机器：${yellow}https://my.racknerd.com/aff
     26)
         webssh_menu
         ;;
+    27)
+        run_repo_script linecheck.sh
+        ;;
+    28)
+        read -r -p "要检测的域名 (默认 www.google.com): " dns_target
+        run_repo_script dnscheck.sh "${dns_target:-www.google.com}"
+        ;;
+    29)
+        run_repo_script tune.sh status
+        echo
+        echo -e "${yellow}1) 应用调优  2) 还原  0) 返回${plain}"
+        read -r -p "请选择: " tune_choice
+        case "$tune_choice" in
+            1) run_repo_script tune.sh apply ;;
+            2) run_repo_script tune.sh revert ;;
+            *) ;;
+        esac
+        ;;
     *)
-        LOGE "请输入正确的数字选项 [0-26]"
+        LOGE "请输入正确的数字选项 [0-29]"
         ;;
     esac
 }

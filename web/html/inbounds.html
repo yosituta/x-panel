@@ -298,6 +298,9 @@
                     <a-button type="primary" icon="link" @click="handleSubscriptionConversion">
                       <template v-if="!isMobile">{{ i18n "pages.inbounds.is_subConversion" }}</template>
                     </a-button>
+                    <a-button type="primary" icon="swap" @click="relayForm.visible = true">
+                      <template v-if="!isMobile">中转节点</template>
+                    </a-button>
                   </a-space>
                 </template>
                 <template #extra>
@@ -702,6 +705,51 @@
         </transition>
       </a-spin>
     <a-modal
+      title="一键中转节点"
+      :visible="relayForm.visible"
+      :class="themeSwitcher.currentTheme"
+      :footer="null"
+      :width="620"
+      @cancel="relayForm.visible = false"
+   >
+      <a-alert type="info" show-icon style="margin-bottom: 16px"
+        message="入口建在本机，流量经远程 Socks5/HTTP 上游出去；客户端拿到的是本机地址的普通节点。" />
+      <a-form :label-col="{ span: 7 }" :wrapper-col="{ span: 15 }" :colon="false">
+        <a-form-item label="上游类型">
+          <a-radio-group v-model="relayForm.upstreamType" button-style="solid">
+            <a-radio-button value="socks">Socks5</a-radio-button>
+            <a-radio-button value="http">HTTP</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item label="上游地址">
+          <a-input v-model="relayForm.upstreamHost" placeholder="1.2.3.4 或 域名" />
+        </a-form-item>
+        <a-form-item label="上游端口">
+          <a-input-number v-model="relayForm.upstreamPort" :min="1" :max="65535" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="上游用户名">
+          <a-input v-model="relayForm.upstreamUser" placeholder="没有就留空" />
+        </a-form-item>
+        <a-form-item label="上游密码">
+          <a-input-password v-model="relayForm.upstreamPass" placeholder="没有就留空" />
+        </a-form-item>
+        <a-form-item label="本机入口端口">
+          <a-input-number v-model="relayForm.port" :min="1024" :max="65535" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-input v-model="relayForm.name" placeholder="relay-东京" />
+        </a-form-item>
+        <a-form-item :wrapper-col="{ span: 15, offset: 7 }">
+          <a-space>
+            <a-button type="primary" :loading="relayForm.loading" @click="createRelay">创建</a-button>
+            <a-button @click="relayForm.visible = false">取消</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
+      <a-textarea v-if="relayForm.result" v-model="relayForm.result" readonly
+        :auto-size="{ minRows: 3, maxRows: 8 }" style="margin-top: 8px" />
+    </a-modal>
+    <a-modal
       :title="`{{ i18n "pages.inbounds.oneClick.title" }}`"
       :visible="oneClickModalVisible"
       :cancel-text="`{{ i18n "cancel" }}`"
@@ -980,6 +1028,12 @@
             oneClickAdvanced: false,
             oneClickDomainLoading: false,
             oneClickResult: null,
+            // 【开源增强】一键中转节点
+            relayForm: {
+                visible: false, loading: false, result: '',
+                upstreamType: 'socks', upstreamHost: '', upstreamPort: 1080,
+                upstreamUser: '', upstreamPass: '', port: 21000, name: '',
+            },
             oneClickForm: {
                 preset: 'auto',
                 count: 10,
@@ -2052,6 +2106,35 @@ async openPort(port) {
                     base + '?target=singbox',
                     base + '?target=surge',
                 ].join('\r\n\r\n');
+            },
+            // 【开源增强】一键中转节点
+            async createRelay() {
+                const f = this.relayForm;
+                if (!f.upstreamHost || !f.upstreamPort) {
+                    this.$message.error('上游地址和端口必填');
+                    return;
+                }
+                f.loading = true;
+                try {
+                    const msg = await HttpUtil.post('/panel/api/inbounds/relay', {
+                        name: f.name || ('relay-' + f.port),
+                        port: f.port,
+                        upstreamType: f.upstreamType,
+                        upstreamHost: f.upstreamHost,
+                        upstreamPort: f.upstreamPort,
+                        upstreamUser: f.upstreamUser,
+                        upstreamPass: f.upstreamPass,
+                    });
+                    if (msg.success) {
+                        f.result = msg.obj.link;
+                        this.$message.success('中转节点已创建，Xray 正在重载');
+                        await this.getDBInbounds();
+                    } else {
+                        this.$message.error(msg.msg || '创建失败');
+                    }
+                } finally {
+                    f.loading = false;
+                }
             },
             exportSubs(dbInboundId) {
                 const dbInbound = this.dbInbounds.find(row => row.id === dbInboundId);
