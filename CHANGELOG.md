@@ -8,6 +8,19 @@
 
 ---
 
+## CDN 自动识别（2026-10-26）
+
+TLS 系预设（TLS / Trojan / VLESS 加密）生成节点时，会自动判断面板域名是否在 Cloudflare 后面：
+
+- **检测方式**：解析域名，比对 Cloudflare 官方公布的代理网段（22 个 CIDR，含 IPv6），结果缓存 10 分钟
+- **命中时自动做的事**：
+  1. 入站端口从 Cloudflare 支持的回源端口里挑（2053 / 2083 / 2087 / 2096 / 8443 / 443），否则 CDN 转发不进来
+  2. 额外生成一条指向 CDN 域名的分享链接（`vless://…@域名:端口?security=tls&sni=域名&…`），在结果里以 `CDN` 标签列出
+- **未命中时**：行为完全不变，不多问一句、不增加任何选项
+- 有 CDN 链接时不再自动弹出直连二维码，而是把两条链接一起列出来，避免用户选错
+
+Reality 系预设无法走 CDN（CDN 会终止 TLS），因此不做转换。
+
 ## 新增两个预设，一键配置扩到四个选项（2026-10-26）
 
 与上游 `vless_reality / vless_xhttp_reality / vless_tls_encryption / switch_vision_seed_dev` 对齐：

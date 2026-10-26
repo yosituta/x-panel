@@ -8,6 +8,19 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Automatic CDN detection (2026-10-26)
+
+When a TLS-based preset (TLS / Trojan / VLESS Encryption) creates a node, the panel now checks whether its own domain sits behind Cloudflare:
+
+- **Detection**: resolve the domain and match it against Cloudflare's published proxy ranges (22 CIDRs, IPv6 included); the result is cached for 10 minutes
+- **When it matches**:
+  1. the inbound port is chosen from Cloudflare's supported origin ports (2053 / 2083 / 2087 / 2096 / 8443 / 443) — otherwise the CDN cannot reach the origin
+  2. an extra share link pointing at the CDN domain is emitted and listed with a `CDN` tag
+- **When it does not match**: nothing changes — no extra questions, no extra options
+- With a CDN link present, the direct-connect QR code is no longer opened automatically; both links are listed so the user does not pick the wrong one
+
+Reality-based presets cannot go through a CDN (the CDN terminates TLS), so they are left untouched.
+
 ## Two more presets — one-click setup now offers four options (2026-10-26)
 
 Aligned with upstream `vless_reality / vless_xhttp_reality / vless_tls_encryption / switch_vision_seed_dev`:

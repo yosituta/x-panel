@@ -869,12 +869,20 @@
 
         <div style="max-height: 260px; overflow-y: auto; margin-top: 10px">
           <div v-for="item in (oneClickResult.created || [])" :key="item.id"
-            style="display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px dashed rgba(128,128,128,.25)">
-            <a-tag color="blue">[[ item.port ]]</a-tag>
-            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-              :title="item.link">[[ item.remark ]]</span>
-            <a-button size="small" icon="copy" @click="copyOneClickLink(item.link)"
-              :disabled="!item.link"></a-button>
+            style="padding: 6px 0; border-bottom: 1px dashed rgba(128,128,128,.25)">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <a-tag color="blue">[[ item.port ]]</a-tag>
+              <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                :title="item.link">[[ item.remark ]]</span>
+              <a-button size="small" icon="copy" @click="copyOneClickLink(item.link)"
+                :disabled="!item.link"></a-button>
+            </div>
+            <div v-if="item.cdnLink" style="display: flex; align-items: center; gap: 8px; margin-top: 4px">
+              <a-tag color="orange">CDN</a-tag>
+              <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75"
+                :title="item.cdnLink">Cloudflare 已自动带出，优先使用这条</span>
+              <a-button size="small" type="primary" icon="copy" @click="copyOneClickLink(item.cdnLink)"></a-button>
+            </div>
           </div>
         </div>
       </template>
@@ -1372,11 +1380,11 @@ async openPort(port) {
                         this.$message.success(`已创建 ${created} 条节点` + (failed ? `，${failed} 条失败` : ''));
                         await this.getDBInbounds();
                         // 【一键配置】只生成一条时，直接弹出二维码，省掉一次点击
-                        if (created === 1 && !failed) {
-                            const item = (msg.obj.created || [])[0] || {};
+                        const only = (msg.obj.created || [])[0] || {};
+                        if (created === 1 && !failed && !only.cdnLink) {
                             this.oneClickModalVisible = false;
-                            if (item.id) {
-                                this.$nextTick(() => this.showQrcode(item.id));
+                            if (only.id) {
+                                this.$nextTick(() => this.showQrcode(only.id));
                             }
                         }
                     } else {

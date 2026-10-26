@@ -84,6 +84,7 @@ type DeployedInbound struct {
 	Path       string `json:"path,omitempty"`       // XHTTP 路径
 	Mode       string `json:"mode,omitempty"`       // XHTTP 模式
 	Encryption string `json:"encryption,omitempty"` // VLESS Encryption 客户端串
+	CDNLink    string `json:"cdnLink,omitempty"`    // 自动识别的 CDN 链接（域名在 Cloudflare 后面时才有）
 	Link       string `json:"link"`
 }
 
@@ -551,6 +552,38 @@ func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 	return ""
 }
 
+// buildCDNLink 生成走 Cloudflare 的分享链接：
+// 客户端连 CDN 域名的同号端口，由 Cloudflare 终止 TLS 后回源到本机。
+func buildCDNLink(o *BatchDeployOptions, d *DeployedInbound) string {
+	if o.Host == "" || d.ServerName == "" {
+		return ""
+	}
+	fp := o.Fingerprint
+	if fp == "" {
+		fp = DefaultFingerprint
+	}
+	host := d.ServerName // 就是面板/证书域名，也就是 Cloudflare 上那个橙色云域名
+	switch d.Preset {
+	case PresetTLS:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=tcp&encryption=none&security=tls&sni=%s&fp=%s#%s-CDN",
+			d.UUID, host, d.Port, host, fp, d.Remark,
+		)
+	case PresetTrojan:
+		return fmt.Sprintf(
+			"trojan://%s@%s:%d?security=tls&sni=%s&fp=%s#%s-CDN",
+			d.Password, host, d.Port, host, fp, d.Remark,
+		)
+	case PresetTLSEncryption:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?type=xhttp&encryption=%s&security=tls&sni=%s&fp=%s&alpn=h2&path=%s&mode=%s&host=%s#%s-CDN",
+			d.UUID, host, d.Port, url.QueryEscape(d.Encryption), host, fp,
+			url.QueryEscape(d.Path), d.Mode, host, d.Remark,
+		)
+	}
+	return ""
+}
+
 // Deploy 执行批量部署。返回 (结果, 是否需要重启 Xray, 错误)
 func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, bool, error) {
 	if o == nil {
@@ -628,6 +661,12 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		creds = &tlsCreds{CertFile: cert, KeyFile: key, ServerName: serverName}
 	}
 
+	// CDN 自动识别：TLS 系预设 + 面板域名在 Cloudflare 后面时自动走 CDN
+	cdnBehind := false
+	if creds != nil && creds.ServerName != "" {
+		cdnBehind = IsBehindCloudflare(creds.ServerName)
+	}
+
 	// Reality 预设需要偷用域名（未指定则探测一个可用的）
 	domain := o.Domain
 	if o.Preset == PresetRealityLegacy {
@@ -646,6 +685,18 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 	port := o.StartPort
 	if port < minUsablePort || port > maxBatchPort {
 		port = defaultBatchPort
+	}
+
+	// CDN 模式下入站端口必须是 Cloudflare 支持的回源端口，否则 CDN 转发不到
+	if cdnBehind && o.StartPort == 0 {
+		var probe InboundService
+		for _, p := range CDNPorts() {
+			existed, _ := probe.checkPortExist(o.Listen, p, 0)
+			if !existed && portAvailable(p) {
+				port = p
+				break
+			}
+		}
 	}
 
 	var inboundService InboundService
@@ -696,6 +747,12 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 			needRestart = true
 		}
 		deployed.Id = saved.Id
+		if cdnBehind && IsCDNPort(deployed.Port) {
+			switch o.Preset {
+			case PresetTLS, PresetTrojan, PresetTLSEncryption:
+				deployed.CDNLink = buildCDNLink(o, deployed)
+			}
+		}
 		result.Created = append(result.Created, *deployed)
 		port++
 	}
