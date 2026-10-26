@@ -554,15 +554,15 @@ func buildLink(o *BatchDeployOptions, d *DeployedInbound) string {
 
 // buildCDNLink 生成走 Cloudflare 的分享链接：
 // 客户端连 CDN 域名的同号端口，由 Cloudflare 终止 TLS 后回源到本机。
-func buildCDNLink(o *BatchDeployOptions, d *DeployedInbound) string {
-	if o.Host == "" || d.ServerName == "" {
+func buildCDNLink(o *BatchDeployOptions, d *DeployedInbound, cdnDomain string) string {
+	if o.Host == "" || cdnDomain == "" {
 		return ""
 	}
 	fp := o.Fingerprint
 	if fp == "" {
 		fp = DefaultFingerprint
 	}
-	host := d.ServerName // 就是面板/证书域名，也就是 Cloudflare 上那个橙色云域名
+	host := cdnDomain // 橙云域名，客户端连它，Cloudflare 回源到本机同号端口
 	switch d.Preset {
 	case PresetTLS:
 		return fmt.Sprintf(
@@ -661,11 +661,12 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		creds = &tlsCreds{CertFile: cert, KeyFile: key, ServerName: serverName}
 	}
 
-	// CDN 自动识别：TLS 系预设 + 面板域名在 Cloudflare 后面时自动走 CDN
-	cdnBehind := false
+	// CDN 自动识别：优先判断填写的域名，其次自动嗅探同主域下的 cdn.xxx / cdn1.xxx
+	cdnDomain := ""
 	if creds != nil && creds.ServerName != "" {
-		cdnBehind = IsBehindCloudflare(creds.ServerName)
+		cdnDomain = FindCDNDomain(creds.ServerName)
 	}
+	cdnBehind := cdnDomain != ""
 
 	// Reality 预设需要偷用域名（未指定则探测一个可用的）
 	domain := o.Domain
@@ -750,7 +751,7 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		if cdnBehind && IsCDNPort(deployed.Port) {
 			switch o.Preset {
 			case PresetTLS, PresetTrojan, PresetTLSEncryption:
-				deployed.CDNLink = buildCDNLink(o, deployed)
+				deployed.CDNLink = buildCDNLink(o, deployed, cdnDomain)
 			}
 		}
 		result.Created = append(result.Created, *deployed)
