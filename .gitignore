@@ -42,3 +42,7 @@ docker-compose.override.yml
 .toolchain/
 /x-ui
 /x-panel-open.exe
+
+# 上游文档截图（28MB，README 未使用）
+media/
+windows_files/*.exe
