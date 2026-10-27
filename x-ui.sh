@@ -1582,21 +1582,27 @@ warp_cloudflare() {
     esac
 }
 
-# --------- 订阅转换（面板内置，无需第三方服务） ----------
+# --------- 订阅系统 SublinkPro（独立服务，端口 15268） ----------
 subconverter() {
-echo ""
-echo -e "${green}===============================================${plain}"
-echo -e "订阅转换已内置，无需再安装 Sublink / Nginx"
-echo -e "===============================================${plain}"
-echo ""
-echo -e "每个客户端都带一个 16 位 subId，直接在浏览器或客户端填："
-echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>${plain}                 # V2Ray"
-echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=clash${plain}    # Clash"
-echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=singbox${plain}  # sing-box"
-echo -e "  ${yellow}https://<面板域名>:<端口><访问路径>sub/<subId>?target=surge${plain}    # Surge"
-echo ""
-echo -e "在面板【入站】页面 → 右上角菜单 → 导出-订阅设置，可直接拿到完整链接。"
-echo ""
+    echo ""
+    echo -e "${green}===============================================${plain}"
+    echo -e " 订阅系统 SublinkPro"
+    echo -e "   登录后可添加多台服务器的节点、自由创建订阅、勾选节点，"
+    echo -e "   最终得到一条包含全部节点的订阅链接。"
+    echo -e "${green}===============================================${plain}"
+    echo ""
+    echo -e "  1. 安装 / 修复"
+    echo -e "  2. 查看状态"
+    echo -e "  3. 卸载"
+    echo -e "  0. 返回"
+    echo ""
+    read -p "请选择 [0-3]: " c
+    case "$c" in
+        1) run_repo_script sublinkpro.sh install ;;
+        2) run_repo_script sublinkpro.sh status ;;
+        3) run_repo_script sublinkpro.sh uninstall ;;
+        *) return ;;
+    esac
 }
 
 run_speedtest() {

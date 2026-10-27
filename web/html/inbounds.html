@@ -1443,25 +1443,25 @@ async openPort(port) {
                 this.inboundLink = '';          // 关闭时清空链接，以便下次重新打开时显示选项
             },
 
-            // 【开源增强】订阅转换已内置：直接用面板的 /sub/<subId>，四种客户端格式现成支持，
-            // 不再安装 sublink / nginx，也就不需要 8000、15268 这些额外端口。
+            // 【开源增强】订阅系统 = SublinkPro（独立服务，本机 8000，由 nginx 用面板证书反代到 15268）
+            // 在这里可以添加多台服务器的节点、自由创建订阅、勾选节点后生成一条总订阅链接。
             handleSubscriptionConversion() {
-                const subLinks = [];
-                for (const dbInbound of this.dbInbounds) {
-                    const clients = this.getInboundClients(dbInbound);
-                    if (!clients) continue;
-                    clients.forEach(c => {
-                        if (c.subId && c.subId.length > 0) {
-                            subLinks.push(this.subURLBlock(c.subId));
-                        }
-                    });
-                }
-                const uniq = [...new Set(subLinks)];
-                if (uniq.length === 0) {
-                    this.$message.warning('还没有带 subId 的客户端，请先用【一键配置】创建节点');
-                    return;
-                }
-                txtModal.show('订阅转换（内置）', uniq.join('\r\n\r\n'), 'Subs');
+                const url = `https://${window.location.hostname}:15268`;
+                window.open(url, '_blank');
+                this.$info({
+                    title: '订阅系统 SublinkPro',
+                    width: 560,
+                    content: [
+                        '已在新标签页打开：' + url,
+                        '',
+                        '默认账号：admin',
+                        '默认密码：123456',
+                        '',
+                        '首次登录后请立即修改密码；如果你有几十台服务器，',
+                        '把各台的分享链接添加进来，就能用一条订阅链接分发全部节点。',
+                    ].join('\n'),
+                    class: themeSwitcher.currentTheme,
+                });
             },
 
             generalActions(action) {

@@ -287,6 +287,8 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.api = controller.NewAPIController(g)
 	// 【开源增强】订阅与格式转换（公开访问，靠 subId 鉴权）
 	controller.NewSubController(g)
+	// 【开源增强】订阅系统：多节点聚合订阅（管理需登录，/subg/:token 公开）
+	controller.NewSubGroupController(g)
 	// 【开源增强】多面板：被控端 API（靠 slaveKey 鉴权）
 	controller.NewSlaveController(g)
 	// 【开源增强】多面板：主控端管理接口（需登录）
