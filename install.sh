@@ -499,19 +499,46 @@ install_free_version() {
         echo "$random_string"
     }
 
+    # 交互安装同样自动启用防火墙并放行面板端口（用户要求：装完即可访问）
+    xp_open_firewall() {
+        local port
+        port=$(/usr/local/x-ui/x-ui setting -show true 2>/dev/null | grep -Eo 'port（端口号）: [0-9]+' | awk '{print $2}')
+        port="${port:-54321}"
+        if command -v ufw >/dev/null 2>&1; then
+            ufw allow "${port}"/tcp >/dev/null 2>&1 || true
+            ufw allow 22/tcp >/dev/null 2>&1 || true
+            ufw allow 80/tcp >/dev/null 2>&1 || true
+            ufw allow 443/tcp >/dev/null 2>&1 || true
+            ufw status 2>/dev/null | grep -q "Status: active" || echo "y" | ufw enable >/dev/null 2>&1 || true
+            echo -e "${green}防火墙：已启用并放行 ${port}/tcp、22、80、443（节点端口由面板按需放行）${plain}"
+        elif command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+            local p
+            for p in "${port}" 22 80 443; do firewall-cmd --add-port="${p}"/tcp --permanent >/dev/null 2>&1 || true; done
+            firewall-cmd --reload >/dev/null 2>&1 || true
+            echo -e "${green}防火墙：已放行 ${port}/tcp、22、80、443${plain}"
+        else
+            echo -e "${yellow}未检测到 ufw / firewalld，若用云厂商安全组请自行放行 ${port}/tcp${plain}"
+        fi
+    }
+
     # This function will be called when user installed x-ui out of security
     config_after_install() {
         echo -e "${yellow}安装/更新完成！ 为了您的面板安全，建议修改面板设置 ${plain}"
         echo ""
         read -p "$(echo -e "${green}想继续修改吗？${red}选择“n”以保留旧设置${plain} [y/n]？--->>请输入：")" config_confirm
         if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-            read -p "请设置您的用户名: " config_account
+            # 直接回车即用默认值，不必手输
+            read -p "请设置您的用户名 [admin]: " config_account
+            config_account="${config_account:-admin}"
             echo -e "${yellow}您的用户名将是: ${config_account}${plain}"
-            read -p "请设置您的密码: " config_password
+            read -p "请设置您的密码 [123456]: " config_password
+            config_password="${config_password:-123456}"
             echo -e "${yellow}您的密码将是: ${config_password}${plain}"
-            read -p "请设置面板端口: " config_port
+            read -p "请设置面板端口 [54321]: " config_port
+            config_port="${config_port:-54321}"
             echo -e "${yellow}您的面板端口号为: ${config_port}${plain}"
-            read -p "请设置面板登录访问路径: " config_webBasePath
+            read -p "请设置面板登录访问路径 [/]: " config_webBasePath
+            config_webBasePath="${config_webBasePath:-/}"
             echo -e "${yellow}您的面板访问路径为: ${config_webBasePath}${plain}"
             echo -e "${yellow}正在初始化，请稍候...${plain}"
             /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password}
@@ -635,6 +662,7 @@ install_free_version() {
         sleep 2
         echo ""
         config_after_install
+        xp_open_firewall
 
     ssh_forwarding() {
         # 获取 IPv4 和 IPv6 地址
