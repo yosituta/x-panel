@@ -202,6 +202,9 @@ auto_install() {
         ufw allow "$A_PORT"/tcp >/dev/null 2>&1 || true
         if [[ "$use_cert" == "1" ]]; then ufw allow 80/tcp >/dev/null 2>&1 || true; fi
         ufw allow 22/tcp >/dev/null 2>&1 || true
+        ufw allow 443/tcp >/dev/null 2>&1 || true
+        # 一键配置生成的节点端口是随机的，整段放行，否则节点建了也连不上
+        ufw allow 10000:60000/tcp >/dev/null 2>&1 || true
         # 未启用则直接启用（用户要求安装时自动打开防火墙）
         if ! ufw status 2>/dev/null | grep -q "Status: active"; then
             echo "y" | ufw enable >/dev/null 2>&1 || true
@@ -212,6 +215,8 @@ auto_install() {
     if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
         firewall-cmd --add-port="$A_PORT"/tcp --permanent >/dev/null 2>&1 || true
         [[ "$use_cert" == "1" ]] && firewall-cmd --add-port=80/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --add-port=443/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --add-port=10000-60000/tcp --permanent >/dev/null 2>&1 || true
         firewall-cmd --reload >/dev/null 2>&1 || true
         fw_done=1
         echo "  firewalld: 已放行 ${A_PORT}/tcp"
