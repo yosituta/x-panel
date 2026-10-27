@@ -20,10 +20,10 @@ import (
 type BackupService struct{}
 
 const (
-	backupDirName    = "backups"
+	backupDirName = "backups"
 	// DefaultBackupKeep 默认保留的快照份数
 	DefaultBackupKeep = 10
-	sqliteHeader     = "SQLite format 3"
+	sqliteHeader      = "SQLite format 3"
 )
 
 // Snapshot 一份快照的元信息

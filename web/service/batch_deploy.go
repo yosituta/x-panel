@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -585,24 +584,6 @@ func buildCDNLink(o *BatchDeployOptions, d *DeployedInbound, cdnDomain string) s
 	return ""
 }
 
-// allowFirewallPort 一键配置生成的节点端口是随机分配的。
-// 如果系统启用了 ufw，必须同步放行，否则会出现「节点已创建、客户端连不上」。
-// 失败只记日志，不影响入站创建。
-func allowFirewallPort(port int) {
-	if _, err := exec.LookPath("ufw"); err != nil {
-		return
-	}
-	out, err := exec.Command("ufw", "status").Output()
-	if err != nil || !strings.Contains(string(out), "Status: active") {
-		return
-	}
-	if err := exec.Command("ufw", "allow", fmt.Sprintf("%d/tcp", port)).Run(); err != nil {
-		logger.Warningf("放行防火墙端口 %d 失败: %v", port, err)
-		return
-	}
-	logger.Infof("防火墙已放行端口 %d/tcp", port)
-}
-
 // Deploy 执行批量部署。返回 (结果, 是否需要重启 Xray, 错误)
 func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, bool, error) {
 	if o == nil {
@@ -767,7 +748,7 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 			needRestart = true
 		}
 		deployed.Id = saved.Id
-		allowFirewallPort(deployed.Port)
+		EnsureFirewallPort(deployed.Port)
 		if cdnBehind && IsCDNPort(deployed.Port) {
 			switch o.Preset {
 			case PresetTLS, PresetTrojan, PresetTLSEncryption:

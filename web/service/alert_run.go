@@ -16,9 +16,9 @@ import (
 type AlertService struct{}
 
 const (
-	alertStateKey     = "alertNotifyState"
-	defaultAlertPct   = 80
-	defaultAlertDays  = 3
+	alertStateKey    = "alertNotifyState"
+	defaultAlertPct  = 80
+	defaultAlertDays = 3
 )
 
 // config 读取告警配置，取不到时使用默认值

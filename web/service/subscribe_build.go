@@ -21,19 +21,19 @@ type SubscribeService struct{}
 
 // 入站 settings 里客户端集合的通用结构
 type subClients struct {
-	Clients []model.Client `json:"clients"`
-	Method  string         `json:"method"`
-	Password string        `json:"password"`
-	Network string         `json:"network"`
+	Clients  []model.Client `json:"clients"`
+	Method   string         `json:"method"`
+	Password string         `json:"password"`
+	Network  string         `json:"network"`
 }
 
 // streamSettings 只取渲染需要到的字段，兼容平铺与嵌套两种写法
 type subStream struct {
-	Network         string `json:"network"`
-	Security        string `json:"security"`
-	TcpSettings     struct {
+	Network     string `json:"network"`
+	Security    string `json:"security"`
+	TcpSettings struct {
 		Header struct {
-			Type   string `json:"type"`
+			Type    string `json:"type"`
 			Request struct {
 				Path    []string          `json:"path"`
 				Headers map[string]string `json:"headers"`
@@ -56,14 +56,14 @@ type subStream struct {
 		} `json:"settings"`
 	} `json:"tlsSettings"`
 	RealitySettings struct {
-		ServerName string   `json:"serverName"`
+		ServerName  string   `json:"serverName"`
 		ServerNames []string `json:"serverNames"`
-		PublicKey  string   `json:"publicKey"`
-		ShortID    string   `json:"shortId"`
-		ShortIDs   []string `json:"shortIds"`
-		Fingerprint string  `json:"fingerprint"`
-		SpiderX    string   `json:"spiderX"`
-		Settings   struct {
+		PublicKey   string   `json:"publicKey"`
+		ShortID     string   `json:"shortId"`
+		ShortIDs    []string `json:"shortIds"`
+		Fingerprint string   `json:"fingerprint"`
+		SpiderX     string   `json:"spiderX"`
+		Settings    struct {
 			PublicKey   string `json:"publicKey"`
 			Fingerprint string `json:"fingerprint"`
 			SpiderX     string `json:"spiderX"`
