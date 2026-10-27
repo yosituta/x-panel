@@ -35,14 +35,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
-  --auto \
-  --domain panel1.example.com --email you@example.com
+  --auto --domain panel1.example.com
 ```
 
-没给的参数会自动生成：访问路径 `/xp-xxxxxx`、随机 16 位密码。安装结束会打印：
+默认值：端口 `54321`、路径 `/`、账号 `admin` / 密码 `123456`（登录后请立即修改）。安装结束会打印：
 
 ```
-登录地址 : https://panel1.example.com:33333/
+登录地址 : https://panel1.example.com:54321/
 用户名   : admin
 密码     : 123456        ← 默认值，登录后请立即修改
 ```
@@ -53,8 +52,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 | --- | --- | --- |
 | `--auto` | 启用无人值守 | — |
 | `--domain` | 面板域名，填了就自动申请 Let's Encrypt 证书 | 不申请 |
-| `--email` | Let's Encrypt 注册邮箱（用于证书到期提醒） | `admin@<域名主域>` |
-| `--panel-port` | 面板端口 | `33333` |
+| `--email` | 一般不用填；内部自动用 `admin@<域名主域>` 注册 | `admin@<域名主域>` |
+| `--panel-port` | 面板端口 | `54321` |
 | `--path` | 访问路径 | `/`（不加密路径） |
 | `--user` / `--pass` | 登录凭据 | `admin` / `123456`（登录后请立即改） |
 | `--no-cert` | 明确不申请证书 | — |
@@ -64,18 +63,18 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 先看计划再执行：
 
 ```bash
-bash install.sh --auto --domain panel1.example.com --email you@example.com --dry-run
+bash install.sh --auto --domain panel1.example.com --dry-run
 ```
 
 ### 安装做了什么
 
 1. 装依赖（curl/wget/tar/socat/cron）
-2. 预装 acme.sh（菜单 18 可直接申请/续期证书）
+2. 预装 acme.sh 并确保 cron 生效；证书剩余 **15 天**时自动续期（`--days 15`）
 3. 从 GitHub Release 下载安装包（**Xray 内核随包固定，不追最新**）
 4. 安装到 `/usr/local/x-ui`，注册 `x-ui.service` 并开机自启
 5. 非交互写入端口 / 路径 / 账号 / 密码
 6. 有域名则用 acme.sh standalone 签发证书并绑定到面板
-7. 防火墙（ufw / firewalld）自动放行面板端口
+7. 防火墙自动处理：ufw 装了就直接**启用**并放行面板端口 / 22 / 80；firewalld 同理
 8. 启动服务并自检，打印登录地址
 
 ---
@@ -94,7 +93,7 @@ panel3.example.com  /  cdn3.example.com   →  服务器 C
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
-  --auto --domain panel2.example.com --email you@example.com
+  --auto --domain panel2.example.com
 ```
 
 如果有 SSH 密钥，可以在一台机器上批量下发：
@@ -102,7 +101,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 ```bash
 for n in 1 2 3; do
   ssh root@10.0.0.$n "bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
-    --auto --domain panel$n.example.com --email you@example.com"
+    --auto --domain panel$n.example.com"
 done
 ```
 

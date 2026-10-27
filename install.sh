@@ -10,8 +10,8 @@ X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 # 无人值守安装（--auto）
 #
 # 用法示例：
-#   bash install.sh --auto --domain panel1.example.com --email me@example.com
-#   （--email 是 Let's Encrypt 注册邮箱，用于证书到期提醒；不填则自动用 admin@主域）
+#   bash install.sh --auto --domain panel1.example.com
+#   （邮箱不用填：内部自动用 admin@主域 向 Let's Encrypt 注册，仅用于账户标识）
 #   bash install.sh --auto --panel-port 23333 --path /xp-abc123 \
 #                   --user admin --pass 'MyPwd' --domain panel1.example.com --email me@example.com
 #   bash install.sh --auto --no-cert --dry-run     # 只看计划不执行
@@ -20,7 +20,7 @@ X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 # ============================================================
 
 AUTO_INSTALL=0
-A_PORT=33333
+A_PORT=54321
 A_PATH="/"
 A_USER="admin"
 A_PASS="123456"
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
         --user) A_USER="$2"; shift 2 ;;
         --pass) A_PASS="$2"; shift 2 ;;
         --domain) A_DOMAIN="$2"; shift 2 ;;
-        --email) A_EMAIL="$2"; shift 2 ;;
+        --email) A_EMAIL="$2"; shift 2 ;;  # 兼容旧用法，一般不需要指定
         --version) A_VERSION="$2"; shift 2 ;;
         --no-cert) A_CERT=0; shift ;;
         --dry-run) A_DRY=1; shift ;;
@@ -108,7 +108,7 @@ auto_install() {
     echo "  Xray 内核 : 随包固定版本（勿随意升级，见 CHANGELOG）"
     echo "  管理菜单  : /usr/bin/x-ui（输入 x-ui 进入）"
     if [[ "$use_cert" == "1" ]]; then
-        echo "  HTTPS     : 是，域名 ${A_DOMAIN}（邮箱 ${A_EMAIL}）"
+        echo "  HTTPS     : 是，域名 ${A_DOMAIN}（注册邮箱 ${A_EMAIL}，剩余 15 天自动续期）"
     else
         echo "  HTTPS     : 否（不申请证书）"
     fi
@@ -128,6 +128,7 @@ auto_install() {
     apt-get install -y -qq curl wget tar socat cron ca-certificates >/dev/null 2>&1 || true
 
     echo -e "${green}---- 2/6 准备 acme.sh ----${plain}"
+    systemctl enable --now cron >/dev/null 2>&1 || true
     if [[ ! -x /root/.acme.sh/acme.sh ]]; then
         curl -s https://get.acme.sh | sh -s email="${A_EMAIL:-noreply@example.com}" >/dev/null 2>&1 \
             && echo "  acme.sh 已安装" || echo "  acme.sh 安装失败（可用 x-ui 菜单 18 重试）"
@@ -173,7 +174,8 @@ auto_install() {
     if [[ "$use_cert" == "1" ]]; then
         echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
         /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
-        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --force >/tmp/xp-acme.log 2>&1; then
+        # --days 15：证书剩余 15 天时自动续期；acme.sh 自带 cron 任务
+        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 15 --force >/tmp/xp-acme.log 2>&1; then
             mkdir -p "/root/cert/${A_DOMAIN}"
             /root/.acme.sh/acme.sh --install-cert -d "$A_DOMAIN" --ecc \
                 --key-file "/root/cert/${A_DOMAIN}/privkey.pem" \
@@ -197,11 +199,15 @@ auto_install() {
     # 防火墙
     local fw_done=0
     if command -v ufw >/dev/null 2>&1; then
-        ufw allow "$A_PORT"/tcp >/dev/null 2>&1 && fw_done=1
+        ufw allow "$A_PORT"/tcp >/dev/null 2>&1 || true
         if [[ "$use_cert" == "1" ]]; then ufw allow 80/tcp >/dev/null 2>&1 || true; fi
-        local ufw_state
-        ufw_state=$(ufw status 2>/dev/null | head -1)
-        echo "  ufw: 已添加 ${A_PORT}/tcp 规则（${ufw_state:-状态未知}）"
+        ufw allow 22/tcp >/dev/null 2>&1 || true
+        # 未启用则直接启用（用户要求安装时自动打开防火墙）
+        if ! ufw status 2>/dev/null | grep -q "Status: active"; then
+            echo "y" | ufw enable >/dev/null 2>&1 || true
+        fi
+        fw_done=1
+        echo "  ufw: $(ufw status 2>/dev/null | head -1)（已放行 ${A_PORT}/tcp, 22/tcp$([[ "$use_cert" == "1" ]] && echo ", 80/tcp")）"
     fi
     if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
         firewall-cmd --add-port="$A_PORT"/tcp --permanent >/dev/null 2>&1 || true
