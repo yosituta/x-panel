@@ -21,6 +21,7 @@
 | 预设体系 | `auto`（默认）/ TLS / Trojan / Reality（Reality 收在「高级预设」里） |
 | Reality 随机域名 | 并发探测 TLS1.3 存活后再挑，避免配到已死的伪装域名 |
 | 内置订阅转换 | `/sub/<subId>` 直接输出 V2Ray / Clash / sing-box / Surge，无需第三方 subconverter |
+| 订阅系统（SublinkPro） | `x-ui` 菜单 25 一键安装；登录后添加各台节点、自由建订阅、勾选节点，得一条总订阅链接（15268） |
 | 一键中转节点 | 本机入口 → 远程 Socks5/HTTP 上游 → 出网，自动写 outbound 与路由规则 |
 
 ### 流量与用户管理

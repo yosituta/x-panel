@@ -1591,10 +1591,10 @@ subconverter() {
     echo -e "   最终得到一条包含全部节点的订阅链接。"
     echo -e "${green}===============================================${plain}"
     echo ""
-    echo -e "  1. 安装 / 修复"
-    echo -e "  2. 查看状态"
-    echo -e "  3. 卸载"
-    echo -e "  0. 返回"
+    echo -e "  ${green}1.${plain} 订阅系统安装/修复     —— 安装 SublinkPro，或用面板证书修复 nginx 反代"
+    echo -e "  ${green}2.${plain} 订阅系统状态查看       —— 服务状态、端口监听、防火墙放行情况"
+    echo -e "  ${green}3.${plain} 订阅系统卸载           —— 停止服务并清理配置（数据目录一并删除）"
+    echo -e "  ${green}0.${plain} 返回主菜单"
     echo ""
     read -p "请选择 [0-3]: " c
     case "$c" in
@@ -2052,7 +2052,7 @@ show_menu() {
   ${green}22.${plain} 启用 BBR 
   ${green}23.${plain} 更新 Geo 文件
   ${green}24.${plain} Speedtest by Ookla
-  ${green}25.${plain} 安装订阅转换 
+  ${green}25.${plain} 订阅系统（SublinkPro 安装/状态/卸载）
   ${green}26.${plain} 网页版 SSH（ttyd）
   ${green}27.${plain} 线路/IP 质量检测
   ${green}28.${plain} 地区 DNS 检测
