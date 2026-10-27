@@ -10,6 +10,42 @@
 
 > 本仓库与上游作者无隶属关系。上游名称与标识仅用于说明来源与致敬。
 
+## 一条命令安装
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
+```
+
+交互式安装，按提示填写；直接回车使用默认值：
+
+- 面板端口 `54321`
+- 访问路径 `/`
+- 账号 `admin` / 密码 `123456`（**登录后请立即修改**）
+
+### 无人值守安装（推荐，多台服务器一致）
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com
+```
+
+- 填了 `--domain` 就会自动申请 Let's Encrypt 证书并绑定 HTTPS，剩余 15 天时自动续期
+- 邮箱不用填，内部自动用 `admin@主域` 注册
+- 自动放行防火墙端口；管理菜单自动装到 `/usr/bin/x-ui`
+- 装完直接打印登录地址与账号密码
+
+先看计划不执行：
+
+```bash
+bash install.sh --auto --domain panel1.example.com --dry-run
+```
+
+其它参数：`--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--version`。
+
+装好后输入 `x-ui` 进入 30 项管理菜单（证书、防火墙、订阅系统、BBR、线路检测、数据快照等）。
+
+完整部署说明（域名规划、多台批量、升级回滚、排错）：[docs/DEPLOY.md](docs/DEPLOY.md)
+
 ## 功能
 
 ### 代理与节点

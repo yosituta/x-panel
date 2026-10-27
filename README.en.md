@@ -10,6 +10,42 @@ A **GPLv3 fork** of [xeefei/X-Panel](https://github.com/xeefei/X-Panel). Upstrea
 
 > Not affiliated with the upstream author. Upstream names are used only to credit the origin.
 
+## One-command install
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
+```
+
+Interactive; press Enter to accept the defaults:
+
+- panel port `54321`
+- base path `/`
+- user `admin` / password `123456` (**change it right after login**)
+
+### Unattended install (recommended, identical across servers)
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
+  --auto --domain panel1.example.com
+```
+
+- Passing `--domain` issues a Let's Encrypt certificate automatically and renews it when 15 days remain
+- No email needed — `admin@your-domain` is used internally
+- Firewall ports are opened automatically; the management menu is installed to `/usr/bin/x-ui`
+- The URL and credentials are printed at the end
+
+Preview the plan without changing anything:
+
+```bash
+bash install.sh --auto --domain panel1.example.com --dry-run
+```
+
+Other flags: `--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--version`.
+
+After installation, run `x-ui` for the 30-item management menu (certificates, firewall, subscription system, BBR, line checks, data snapshots and more).
+
+Full deployment guide (domain layout, multiple servers, upgrades, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
+
 ## Features
 
 ### Proxy & nodes

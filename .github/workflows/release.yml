@@ -85,8 +85,10 @@ jobs:
           cp x-ui stage/x-ui/x-ui
           cp x-ui.sh stage/x-ui/x-ui.sh
           cp x-ui.service stage/x-ui/x-ui.service
+          # 菜单 25/27/28/29 依赖这些脚本，必须随包分发
+          cp -r scripts stage/x-ui/scripts
           cp xraydl/xray "stage/x-ui/bin/xray-linux-${{ matrix.arch }}"
-          chmod +x stage/x-ui/x-ui stage/x-ui/x-ui.sh stage/x-ui/bin/xray-linux-${{ matrix.arch }}
+          chmod +x stage/x-ui/x-ui stage/x-ui/x-ui.sh stage/x-ui/scripts/*.sh stage/x-ui/bin/xray-linux-${{ matrix.arch }}
           cd stage && tar -czf "../x-ui-linux-${{ matrix.arch }}.tar.gz" x-ui
           cd .. && ls -lh x-ui-linux-*.tar.gz
 

@@ -1974,6 +1974,15 @@ run_repo_script() {
     for candidate in "$self_dir/scripts/$name" "/usr/local/x-ui/scripts/$name" "/opt/x-panel/scripts/$name"; do
         if [[ -n "$candidate" && -f "$candidate" ]]; then script="$candidate"; break; fi
     done
+    # 兜底：本地没有就从仓库直接取，避免旧版本升级后缺少 scripts 目录
+    if [[ -z "$script" ]]; then
+        local tmp="/tmp/xp-script-$name"
+        if curl -fsSL --max-time 30 -o "$tmp" "https://raw.githubusercontent.com/${X_PANEL_REPO}/main/scripts/$name" 2>/dev/null; then
+            chmod +x "$tmp"
+            script="$tmp"
+            LOGI "已从仓库下载 scripts/$name"
+        fi
+    fi
     if [[ -z "$script" ]]; then
         LOGE "未找到 scripts/$name，请把仓库的 scripts 目录一起放好"
         before_show_menu
