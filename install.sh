@@ -11,6 +11,7 @@ X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 #
 # 用法示例：
 #   bash install.sh --auto --domain panel1.example.com --email me@example.com
+#   （--email 是 Let's Encrypt 注册邮箱，用于证书到期提醒；不填则自动用 admin@主域）
 #   bash install.sh --auto --panel-port 23333 --path /xp-abc123 \
 #                   --user admin --pass 'MyPwd' --domain panel1.example.com --email me@example.com
 #   bash install.sh --auto --no-cert --dry-run     # 只看计划不执行
@@ -19,10 +20,10 @@ X_PANEL_REPO="${X_PANEL_REPO:-yosituta/x-panel}"
 # ============================================================
 
 AUTO_INSTALL=0
-A_PORT=23333
-A_PATH=""
+A_PORT=33333
+A_PATH="/"
 A_USER="admin"
-A_PASS=""
+A_PASS="123456"
 A_DOMAIN=""
 A_EMAIL=""
 A_CERT=1
@@ -71,10 +72,13 @@ auto_install() {
         echo -e "${red}不支持的架构：$(uname -m)${plain}"; return 1
     fi
 
-    [[ -z "$A_PATH" ]] && A_PATH="/xp-$(auto_rand 6)"
-    A_PATH="/${A_PATH#/}"
-    A_PATH="${A_PATH%/}"
-    [[ -z "$A_PASS" ]] && A_PASS="$(auto_rand 16)"
+    # 默认不加密路径；传 --path /xxx 才会设置
+    if [[ -z "$A_PATH" || "$A_PATH" == "/" ]]; then
+        A_PATH="/"
+    else
+        A_PATH="/${A_PATH#/}"
+    fi
+    [[ -z "$A_PASS" ]] && A_PASS="123456"
 
     if [[ -z "$A_VERSION" ]]; then
         A_VERSION=$(curl -fsSL "https://api.github.com/repos/${X_PANEL_REPO}/releases/latest" 2>/dev/null \
@@ -102,6 +106,7 @@ auto_install() {
     echo "  账号      : ${A_USER}"
     echo "  密码      : ${A_PASS}"
     echo "  Xray 内核 : 随包固定版本（勿随意升级，见 CHANGELOG）"
+    echo "  管理菜单  : /usr/bin/x-ui（输入 x-ui 进入）"
     if [[ "$use_cert" == "1" ]]; then
         echo "  HTTPS     : 是，域名 ${A_DOMAIN}（邮箱 ${A_EMAIL}）"
     else
@@ -157,6 +162,13 @@ auto_install() {
     fi
     echo "  端口 ${A_PORT} / 路径 ${A_PATH} 已写入"
 
+    # 管理菜单：与 3x-ui 一致，输入 x-ui 即可进入
+    if [[ -f /usr/local/x-ui/x-ui.sh ]]; then
+        cp -f /usr/local/x-ui/x-ui.sh /usr/bin/x-ui
+        chmod +x /usr/bin/x-ui
+        echo "  管理菜单已安装：输入 x-ui 进入"
+    fi
+
     local cert_done=0
     if [[ "$use_cert" == "1" ]]; then
         echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
@@ -183,15 +195,23 @@ auto_install() {
     fi
 
     # 防火墙
-    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
-        ufw allow "$A_PORT"/tcp >/dev/null 2>&1 || true
-        [[ "$use_cert" == "1" ]] && ufw allow 80/tcp >/dev/null 2>&1 || true
-        echo "  ufw 已放行 ${A_PORT}/tcp"
+    local fw_done=0
+    if command -v ufw >/dev/null 2>&1; then
+        ufw allow "$A_PORT"/tcp >/dev/null 2>&1 && fw_done=1
+        if [[ "$use_cert" == "1" ]]; then ufw allow 80/tcp >/dev/null 2>&1 || true; fi
+        local ufw_state
+        ufw_state=$(ufw status 2>/dev/null | head -1)
+        echo "  ufw: 已添加 ${A_PORT}/tcp 规则（${ufw_state:-状态未知}）"
     fi
     if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
         firewall-cmd --add-port="$A_PORT"/tcp --permanent >/dev/null 2>&1 || true
+        [[ "$use_cert" == "1" ]] && firewall-cmd --add-port=80/tcp --permanent >/dev/null 2>&1 || true
         firewall-cmd --reload >/dev/null 2>&1 || true
-        echo "  firewalld 已放行 ${A_PORT}/tcp"
+        fw_done=1
+        echo "  firewalld: 已放行 ${A_PORT}/tcp"
+    fi
+    if [[ "$fw_done" == "0" ]]; then
+        echo "  未检测到 ufw / firewalld，若使用云厂商安全组请自行放行 ${A_PORT}/tcp"
     fi
 
     systemctl restart x-ui
@@ -227,7 +247,12 @@ auto_install() {
     echo "  节点域名 : cdnN.example.com    （橙云，Cloudflare 代理）"
     echo "  在面板【一键配置】里选预设，宿主域名与节点域名同号时，CDN 链接会自动带出。"
     echo ""
-    echo "  管理菜单 : 输入 x-ui"
+    if [[ "$A_PASS" == "123456" ]]; then
+        echo -e "${red}  注意：当前密码为默认值 123456，登录后请立即修改${plain}"
+        echo "        修改：x-ui → 6 (重置用户名、密码)"
+        echo ""
+    fi
+    echo "  管理菜单 : 输入 x-ui（二十多项菜单：证书、防火墙、BBR、订阅、快照等）"
     echo "  日志     : journalctl -u x-ui -f"
     return 0
 }

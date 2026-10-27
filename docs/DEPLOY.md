@@ -42,9 +42,9 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 没给的参数会自动生成：访问路径 `/xp-xxxxxx`、随机 16 位密码。安装结束会打印：
 
 ```
-登录地址 : https://panel1.example.com:23333/xp-xxxxxx/
+登录地址 : https://panel1.example.com:33333/
 用户名   : admin
-密码     : 生成的随机密码
+密码     : 123456        ← 默认值，登录后请立即修改
 ```
 
 全部可用参数：
@@ -53,10 +53,10 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 | --- | --- | --- |
 | `--auto` | 启用无人值守 | — |
 | `--domain` | 面板域名，填了就自动申请 Let's Encrypt 证书 | 不申请 |
-| `--email` | ACME 邮箱 | `admin@<域名主域>` |
-| `--panel-port` | 面板端口 | `23333` |
-| `--path` | 访问路径 | 随机 `/xp-xxxxxx` |
-| `--user` / `--pass` | 登录凭据 | `admin` / 随机 16 位 |
+| `--email` | Let's Encrypt 注册邮箱（用于证书到期提醒） | `admin@<域名主域>` |
+| `--panel-port` | 面板端口 | `33333` |
+| `--path` | 访问路径 | `/`（不加密路径） |
+| `--user` / `--pass` | 登录凭据 | `admin` / `123456`（登录后请立即改） |
 | `--no-cert` | 明确不申请证书 | — |
 | `--version` | 指定版本，如 `1.1.0` | 最新 Release |
 | `--dry-run` | 只打印计划，不做任何修改 | — |
@@ -110,7 +110,7 @@ done
 
 ## 四、装完必做：生成节点
 
-1. 浏览器打开 `https://panelN.example.com:<端口><路径>/`
+1. 浏览器打开 `https://panelN.example.com:<端口>/`
 2. 入站列表 → **一键配置**
 3. 选一个预设（无需任何填写）：
    - `1` VLESS + TCP + Reality + Vision — 直连最快
