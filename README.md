@@ -2,13 +2,15 @@
 
 [简体中文](README.md) · **[English](README.en.md)**
 
-基于 [xeefei/X-Panel](https://github.com/xeefei/X-Panel) 的 **GPLv3 开源分支**。上游把「一键配置」等实用功能移入付费 Pro 版并停止向免费版更新，本分支按公开功能说明重新实现，并补上了作者自己需要的运维能力。
+**GPLv3** 开源发布、可长期自维护的 Xray 面板。Go + Gin + SQLite，Xray-core 作为子进程托管，单二进制、一条命令安装，无授权码、无积分、无商业闭环。
 
-- 面板本体：Go + Gin + SQLite，Xray-core 作为子进程托管
-- 一键安装、systemd 托管、单二进制、无外部依赖
-- **不包含**任何上游私有代码；**不实现**授权码/积分/购买机器人等商业闭环
-
-> 本仓库与上游作者无隶属关系。上游名称与标识仅用于说明来源与致敬。
+> **声明**
+>
+> 此项目仅供个人学习、交流使用，请遵守当地法律法规，勿用于非法用途；请勿用于生产环境。
+>
+> **注意**
+>
+> 在使用此项目和〔教程〕过程中，若因违反以上声明使用规则而产生的一切后果由使用者自负。
 
 ## 一条命令安装
 
@@ -83,7 +85,7 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 | Reality 随机域名 | 并发探测 TLS1.3 存活后再挑，避免配到已死的伪装域名 |
 | 内置订阅转换 | `/sub/<subId>` 直接输出 V2Ray / Clash / sing-box / Surge，无需第三方 subconverter |
 | 订阅系统（SublinkPro） | `x-ui` 菜单 25 一键安装；登录后添加各台节点、自由建订阅、勾选节点，得一条总订阅链接（15268） |
-| 一键中转节点 | 本机入口 → 远程 Socks5/HTTP 上游 → 出网，自动写 outbound 与路由规则 |
+| 一键中转节点 | 本机入口 → 远端 Socks5/HTTP 代理 → 出网，自动写 outbound 与路由规则 |
 
 ### 流量与用户管理
 
@@ -116,11 +118,7 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 
 本项目仓库：**https://github.com/yosituta/x-panel**
 
-`install.sh` / `x-ui.sh` 里的 `X_PANEL_REPO` 已指向该仓库。想临时装上游原版：
-
-```bash
-X_PANEL_REPO=xeefei/x-panel bash install.sh
-```
+`install.sh` / `x-ui.sh` 里的 `X_PANEL_REPO` 已指向该仓库。
 
 发布新版本：改完代码 `git tag v1.0.1 && git push origin v1.0.1`，GitHub Actions 会自动编译 amd64/arm64（CGO）并把产物挂到 Release。
 
@@ -134,25 +132,10 @@ git ls-files | grep -E "\.db$|\.pem$|\.key$|\.env$" || echo "无敏感文件"
 
 ## 快速开始
 
-### 一键安装（推荐）
+安装方式见上方「一条命令安装」，装完执行：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
-
-无人值守安装（多台服务器推荐，可自动申请证书）：
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
-  --auto --domain panel1.example.com --email you@example.com
-```
-
-完整部署说明（域名规划、多台批量、排错）：[docs/DEPLOY.md](docs/DEPLOY.md)
-```
-
-安装完成后按提示设置端口、路径、账号密码。管理脚本：
-
-```bash
-x-ui            # 打开管理菜单（含证书、备份、调优、网页 SSH 等）
+x-ui            # 管理菜单：证书、防火墙、订阅系统、备份、调优、网页 SSH 等
 ```
 
 ### 手动编译
@@ -210,22 +193,6 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # 还原（面板需停止）
 x-ui -v                   # 版本
 ```
 
-## 与上游同步
-
-```bash
-git remote add upstream https://github.com/xeefei/X-Panel.git   # 仅首次
-./scripts/sync-upstream.sh --check   # 看上游有没有新提交
-./scripts/sync-upstream.sh           # 合并上游代码
-```
-
-合并后必做：
-
-```bash
-go build ./... && go vet ./... && go test ./...
-```
-
-冲突高发文件：`database/model/model.go`、`web/service/inbound.go`、`web/html/index.html`、`web/html/inbounds.html`、`web/translation/*.toml`。
-
 ## 开发与测试
 
 ```bash
@@ -245,7 +212,7 @@ xray/                Xray 进程与 gRPC API 封装
 database/            SQLite 模型与 DAO
 config/              配置项
 scripts/             运维脚本（调优、DNS、线路、ttyd、e2e、部署、同步）
-docs/                路线图、上游 README、分析笔记
+docs/                路线图、分析笔记
 ```
 
 ## 常见问题
@@ -257,7 +224,7 @@ docs/                路线图、上游 README、分析笔记
 地址取值顺序：订阅域名 → 面板证书目录名 → 机器名。在设置里填「订阅域名」，或访问面板时用域名而非 IP。
 
 **一键中转节点创建后连不上？**
-先确认上游 Socks5/HTTP 本身可用；再看 `xray` 日志里有没有 `failed to dial`。删除用 `POST /panel/api/inbounds/relay/remove/<端口>`，会同步清理 outbound 与路由。
+先确认目标 Socks5/HTTP 代理本身可用；再看 `xray` 日志里有没有 `failed to dial`。删除用 `POST /panel/api/inbounds/relay/remove/<端口>`，会同步清理 outbound 与路由。
 
 **大文件上传到 VPS 老是断？**
 分片上传（`split -b 2M`）+ 逐片校验，或直接在服务器上编译。

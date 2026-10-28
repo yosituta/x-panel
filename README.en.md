@@ -2,13 +2,15 @@
 
 **English** · [简体中文](README.md)
 
-A **GPLv3 fork** of [xeefei/X-Panel](https://github.com/xeefei/X-Panel). Upstream moved practical features such as one-click deployment into a paid "Pro" edition and stopped updating the free edition. This fork re-implements them from the public feature list and adds the operations tooling we actually needed.
+An Xray panel released under **GPLv3** and built to be maintained long-term. Go + Gin + SQLite, Xray-core supervised as a child process, single binary, one-line install — no license keys, no points, no commercial paywall.
 
-- Panel: Go + Gin + SQLite, Xray-core supervised as a child process
-- One-line install, systemd managed, single binary, no external services
-- Contains **no** upstream proprietary code; does **not** implement license-key checks, points, or purchase bots
-
-> Not affiliated with the upstream author. Upstream names are used only to credit the origin.
+> **Disclaimer**
+>
+> This project is provided for personal learning and exchange only. Please comply with your local laws and regulations, do not use it for illegal purposes, and do not use it in production environments.
+>
+> **Note**
+>
+> When using this project or its [tutorials], the user bears sole responsibility for any consequences arising from use that violates the rules stated above.
 
 ## One-command install
 
@@ -82,7 +84,7 @@ Full deployment guide (domain layout, multiple servers, upgrades, troubleshootin
 | Presets | `auto` (default) / TLS / Trojan / Reality (Reality is tucked under "advanced presets") |
 | Random Reality target | Concurrent TLS1.3 liveness probing before picking a disguise domain |
 | Built-in subscription converter | `/sub/<subId>` emits V2Ray / Clash / sing-box / Surge — no third-party subconverter |
-| One-click relay node | Local entry → remote Socks5/HTTP upstream → internet; outbound and routing rules written automatically |
+| One-click relay node | Local entry → remote Socks5/HTTP proxy → internet; outbound and routing rules written automatically |
 
 ### Traffic & users
 
@@ -115,11 +117,7 @@ Full deployment guide (domain layout, multiple servers, upgrades, troubleshootin
 
 This project lives at **https://github.com/yosituta/x-panel**.
 
-`X_PANEL_REPO` in `install.sh` / `x-ui.sh` already points here. To install the upstream original instead:
-
-```bash
-X_PANEL_REPO=xeefei/x-panel bash install.sh
-```
+`X_PANEL_REPO` in `install.sh` / `x-ui.sh` already points here.
 
 Release flow: commit, `git tag v1.0.1 && git push origin v1.0.1`, and GitHub Actions builds amd64/arm64 (CGO) and attaches the artifacts to the Release.
 
@@ -133,25 +131,10 @@ git ls-files | grep -E "\.db$|\.pem$|\.key$|\.env$" || echo "no secrets tracked"
 
 ## Quick start
 
-### One-line install (recommended)
+See "One-command install" above; after installation run:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh)
-
-Unattended install (recommended for multiple servers; can obtain the certificate automatically):
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
-  --auto --domain panel1.example.com --email you@example.com
-```
-
-Full deployment guide (domain layout, multiple servers, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
-```
-
-Then set the port, base path and credentials when prompted. Management menu:
-
-```bash
-x-ui            # certificates, snapshots, tuning, web SSH, ...
+x-ui            # menu: certificates, firewall, subscription system, snapshots, tuning, web SSH, ...
 ```
 
 ### Build from source
@@ -209,22 +192,6 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # restore (stop the panel firs
 x-ui -v                   # version
 ```
 
-## Syncing with upstream
-
-```bash
-git remote add upstream https://github.com/xeefei/X-Panel.git   # first time only
-./scripts/sync-upstream.sh --check   # any new upstream commits?
-./scripts/sync-upstream.sh           # merge upstream
-```
-
-Always re-verify after a merge:
-
-```bash
-go build ./... && go vet ./... && go test ./...
-```
-
-Conflict-prone files: `database/model/model.go`, `web/service/inbound.go`, `web/html/index.html`, `web/html/inbounds.html`, `web/translation/*.toml`.
-
 ## Development & tests
 
 ```bash
@@ -244,7 +211,7 @@ xray/                Xray process and gRPC API wrapper
 database/            SQLite models and DAO
 config/              configuration
 scripts/             ops scripts (tuning, DNS, line check, ttyd, e2e, deploy, sync)
-docs/                roadmap, upstream README, analysis notes
+docs/                roadmap, analysis notes
 ```
 
 ## FAQ
@@ -256,7 +223,7 @@ If the server log says `REALITY: authentication failed`, the client's Reality im
 Address resolution order: subscription domain → panel certificate directory name → machine hostname. Set "subscription domain" in settings, or open the panel by domain rather than IP.
 
 **A relay node was created but does not work.**
-Confirm the upstream Socks5/HTTP proxy works on its own first, then look for `failed to dial` in the xray log. Remove it with `POST /panel/api/inbounds/relay/remove/<port>`, which also cleans the outbound and routing rule.
+Confirm the target Socks5/HTTP proxy works on its own first, then look for `failed to dial` in the xray log. Remove it with `POST /panel/api/inbounds/relay/remove/<port>`, which also cleans the outbound and routing rule.
 
 **Uploads to the VPS keep dying.**
 Chunked upload (`split -b 2M`) with per-chunk verification, or build directly on the server.
