@@ -24,15 +24,35 @@ Interactive; press Enter to accept the defaults:
 
 ### Unattended install (recommended, identical across servers)
 
+**A. With a domain (automatic HTTPS, recommended for production)**
+
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
   --auto --domain panel1.example.com
 ```
 
-- Passing `--domain` issues a Let's Encrypt certificate automatically and renews it when 15 days remain
+- Issues a Let's Encrypt certificate automatically and **renews when 15 days remain**
 - No email needed — `admin@your-domain` is used internally
-- Firewall ports are opened automatically; the management menu is installed to `/usr/bin/x-ui`
-- The URL and credentials are printed at the end
+- Opens firewall ports automatically; management menu installed to `/usr/bin/x-ui`
+
+**B. Without a domain (plain IP, self-signed)**
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
+```
+
+- Omitting `--domain` selects this mode automatically — **no** `--no-cert` needed (it is still accepted)
+- The panel and subscription system use **exactly the same ports** as A; only the certificate is self-signed, so the browser asks you to click through once
+
+| | A. With domain | B. No domain |
+| --- | --- | --- |
+| Panel | `https://your-domain:54321` | `https://IP:54321` (self-signed) |
+| Subscription system | `https://your-domain:15268` | `https://IP:15268` (self-signed) |
+| Certificate | Let's Encrypt, auto-renew at 15 days | self-signed, 10 years |
+| CDN / Reality | both supported | both supported (CDN still needs a domain) |
+
+**Adding a domain later (mode B)**: point the A record at the server → `x-ui → 18 → 1` to issue a certificate (automatic issue, automatic binding, auto-renew at 15 days)
+→ the subscription system switches to the real certificate automatically, the URL becomes `https://your-domain:15268`, data is untouched.
 
 Preview the plan without changing anything:
 
@@ -41,19 +61,6 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 ```
 
 Other flags: `--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--version`.
-
-After installation, run `x-ui` for the 30-item management menu (certificates, firewall, subscription system, BBR, line checks, data snapshots and more).
-
-> **No domain?** Just omit `--domain` — the installer automatically runs in plain-IP mode (panel on `https://IP:54321` with a self-signed cert — click through the browser warning):
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
-```
-
-(`--no-cert` still works as an explicit "no certificate" switch; omitting `--domain` already implies it.)
-
-In this mode the subscription system (menu 25) finds no panel certificate and **falls back to `http://IP:8000`** — same features, just without HTTPS.
-Once the domain points at the server and a certificate is issued, run `x-ui → 25 → 1` again and it switches back to `https://your-domain:15268`.
 
 Full deployment guide (domain layout, multiple servers, upgrades, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
 

@@ -1445,14 +1445,10 @@ async openPort(port) {
 
             // 【开源增强】订阅系统 = SublinkPro（独立服务，本机 8000，由 nginx 用面板证书反代到 15268）
             // 在这里可以添加多台服务器的节点、自由创建订阅、勾选节点后生成一条总订阅链接。
-            async handleSubscriptionConversion() {
-                // 有域名的机器走 nginx 反代 15268；纯 IP 无证书的机器退回 8000 直连
-                let url = `https://${window.location.hostname}:15268`;
-                try {
-                    await fetch(`${url}/`, {mode: 'no-cors', signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined});
-                } catch (e) {
-                    url = `http://${window.location.hostname}:8000`;
-                }
+            handleSubscriptionConversion() {
+                // 有域名/无域名都是同一个地址：https://主机:15268
+                // （无域名时用自签证书，浏览器提示"继续访问"即可）
+                const url = `https://${window.location.hostname}:15268`;
                 window.open(url, '_blank');
                 this.$info({
                     title: '订阅系统 SublinkPro',

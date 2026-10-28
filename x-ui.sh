@@ -954,7 +954,7 @@ ssl_cert_issue_standalone_embedded() {
     systemctl stop nginx >/dev/null 2>&1
     systemctl stop x-ui >/dev/null 2>&1
     
-    if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --force; then
+    if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --days 15 --force; then
         LOGE "❌ 证书申请失败！"
         LOGE "请检查：1、域名解析是否正确指向本机 IP。2、80 端口是否开放且未被占用。"
         # 失败尝试重启 x-ui
@@ -978,6 +978,19 @@ ssl_cert_issue_standalone_embedded() {
         --key-file       "${certPath}/privkey.pem" \
         --fullchain-file "${certPath}/fullchain.pem" \
         --reloadcmd      "${reloadCmd}"
+
+    # 确保 acme.sh 的续期定时任务在（剩余 15 天时自动续签）
+    if ! crontab -l 2>/dev/null | grep -q "acme.sh --cron"; then
+        ~/.acme.sh/acme.sh --install-cronjob >/dev/null 2>&1 || \
+            (crontab -l 2>/dev/null; echo "0 3 * * * \"$HOME/.acme.sh\"/acme.sh --cron --home \"$HOME/.acme.sh\" > /dev/null") | crontab - 2>/dev/null
+    fi
+
+    # 订阅系统用的也是这张证书：重配一次 nginx，让它指向新证书
+    if [ -f /etc/nginx/sites-available/sublinkpro ] && [ -f /usr/local/x-ui/scripts/sublinkpro.sh ]; then
+        bash /usr/local/x-ui/scripts/sublinkpro.sh install >/dev/null 2>&1 && LOGI "订阅系统已切换为新证书"
+    elif [ -f /etc/nginx/sites-available/sublinkpro ] && [ -f /opt/x-panel/scripts/sublinkpro.sh ]; then
+        bash /opt/x-panel/scripts/sublinkpro.sh install >/dev/null 2>&1 && LOGI "订阅系统已切换为新证书"
+    fi
         
     if [ $? -eq 0 ]; then
         LOGI "✅ 证书安装命令执行成功！"
@@ -1343,7 +1356,7 @@ ssl_cert_issue() {
     # 签发证书
     echo ""
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --force
+    ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --days 15 --force
     if [ $? -ne 0 ]; then
         LOGE "签发证书失败，请检查日志。"
         rm -rf ~/.acme.sh/${domain}
@@ -1473,7 +1486,7 @@ ssl_cert_issue_CF() {
 
         # 使用 Cloudflare DNS 颁发证书
         echo ""
-        ~/.acme.sh/acme.sh --issue --dns dns_cf -d ${CF_Domain} -d *.${CF_Domain} --log --force
+        ~/.acme.sh/acme.sh --issue --dns dns_cf -d ${CF_Domain} -d *.${CF_Domain} --days 15 --log --force
         if [ $? -ne 0 ]; then
             LOGE "证书颁发失败，脚本正在退出..."
             exit 1

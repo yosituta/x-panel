@@ -24,15 +24,35 @@ bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.
 
 ### 无人值守安装（推荐，多台服务器一致）
 
+**A. 有域名（自动 HTTPS，推荐生产用）**
+
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) \
   --auto --domain panel1.example.com
 ```
 
-- 填了 `--domain` 就会自动申请 Let's Encrypt 证书并绑定 HTTPS，剩余 15 天时自动续期
+- 自动申请 Let's Encrypt 证书并绑定，**剩余 15 天自动续签**（acme.sh cron）
 - 邮箱不用填，内部自动用 `admin@主域` 注册
-- 自动放行防火墙端口；管理菜单自动装到 `/usr/bin/x-ui`
-- 装完直接打印登录地址与账号密码
+- 自动放行防火墙端口；管理菜单装到 `/usr/bin/x-ui`
+
+**B. 无域名（纯 IP，自签证书）**
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
+```
+
+- 不写 `--domain` 就自动按此模式安装，**不需要**额外加 `--no-cert`（写了也等价）
+- 面板与订阅系统端口和 A 方案**完全一致**，只是证书是自签的，浏览器提示"继续访问"点一下即可
+
+| | A. 有域名 | B. 无域名 |
+| --- | --- | --- |
+| 面板 | `https://你的域名:54321` | `https://IP:54321`（自签） |
+| 订阅系统 | `https://你的域名:15268` | `https://IP:15268`（自签） |
+| 证书 | Let's Encrypt，15 天自动续签 | 自签 10 年，装上即可用 |
+| CDN / Reality | 都支持 | 都支持（CDN 仍需域名） |
+
+**B 方案以后补域名**：把域名 A 记录指到本机 → `x-ui → 18 → 1` 申请证书（输入域名即可，自动签发、自动绑定、剩余 15 天自动续签）
+→ 订阅系统会自动换成正式证书，地址从 `https://IP:15268` 变成 `https://你的域名:15268`，数据不受影响。
 
 先看计划不执行：
 
@@ -41,19 +61,6 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 ```
 
 其它参数：`--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--version`。
-
-装好后输入 `x-ui` 进入 30 项管理菜单（证书、防火墙、订阅系统、BBR、线路检测、数据快照等）。
-
-> **没有域名？** 直接不写 `--domain` 即可，脚本会自动按纯 IP 模式安装（面板为 `https://IP:54321`，自签证书，浏览器提示"继续访问"即可）：
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
-```
-
-（`--no-cert` 仍然可用，写上等于显式声明"不要证书"，效果一样；`--auto` 不带域名时本来就跳过证书。）
-
-此模式下订阅系统（菜单 25）找不到面板证书，会**退回 `http://IP:8000` 直连**，功能完全相同，只是没有 HTTPS；
-之后把域名解析到本机、申请证书，再跑一次 `x-ui → 25 → 1` 就会自动切回 `https://你的域名:15268`。
 
 完整部署说明（域名规划、多台批量、升级回滚、排错）：[docs/DEPLOY.md](docs/DEPLOY.md)
 

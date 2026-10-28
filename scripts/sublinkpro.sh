@@ -110,17 +110,36 @@ EOF
     sleep 5
     echo "  服务状态: $(systemctl is-active $SERVICE)"
 
-    echo "---- 3/5 反向代理（面板证书）----"
-    local cert domain
+    echo "---- 3/5 反向代理 ----"
+    local cert domain self_cert=""
     cert=$(find_cert)
     if [ -n "$cert" ]; then
         domain=$(cert_domain "$cert")
         write_nginx "$cert" "$domain"
-        echo "  已用证书: $cert（域名 $domain）"
+        echo "  已用面板证书: $cert（域名 $domain）"
     else
-        echo -e "  ${YELLOW}未找到面板证书，跳过 HTTPS 反代，改用 http://IP:${BACKEND} 直连${PLAIN}"
-        echo -e "  ${YELLOW}（功能完全相同，只是没有 HTTPS；申请证书后重跑本脚本即可切到 ${PORT}）${PLAIN}"
-        allow_port "$BACKEND"
+        # 无域名/无证书：生成自签证书，端口与有域名时完全一致（15268），
+        # 这样两种安装方式访问地址格式相同，后续补上域名会自动换成正签证书。
+        local ip
+        ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
+        [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        [ -z "$ip" ] && ip=127.0.0.1
+        local sdir=/etc/ssl/sublinkpro
+        mkdir -p "$sdir"
+        if [ ! -s "$sdir/fullchain.pem" ]; then
+            openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+                -keyout "$sdir/privkey.pem" -out "$sdir/fullchain.pem" -days 3650 \
+                -subj "/CN=${ip}" >/dev/null 2>&1
+        fi
+        if [ -s "$sdir/fullchain.pem" ]; then
+            write_nginx "$sdir/fullchain.pem" "$ip"
+            self_cert="$sdir/fullchain.pem"
+            echo -e "  ${YELLOW}未找到面板证书 → 已生成自签证书，仍用 https://${ip}:${PORT}${PLAIN}"
+            echo -e "  ${YELLOW}浏览器会提示"不安全"，点"继续访问"即可；补上域名并申请证书后会自动换成正式证书${PLAIN}"
+        else
+            echo -e "  ${YELLOW}未能生成证书，退回 http://IP:${BACKEND} 直连${PLAIN}"
+            allow_port "$BACKEND"
+        fi
     fi
 
     echo "---- 4/5 防火墙 ----"
@@ -142,6 +161,8 @@ EOF
     echo -e "${GREEN}========================================${PLAIN}"
     if [ -n "$domain2" ]; then
         echo -e "  访问地址 : ${YELLOW}https://${domain2}:${PORT}/${PLAIN}"
+    elif [ -n "$self_cert" ]; then
+        echo -e "  访问地址 : ${YELLOW}https://${ip}:${PORT}/${PLAIN}  （自签证书，浏览器点"继续"）"
     else
         echo -e "  访问地址 : ${YELLOW}http://${ip}:${BACKEND}/${PLAIN}"
     fi
@@ -151,6 +172,10 @@ EOF
     echo ""
     echo "  用法：登录后添加各台服务器的节点链接，创建订阅并勾选节点，"
     echo "       即可得到一条包含全部节点的订阅链接。"
+    if [ -n "$self_cert" ]; then
+        echo ""
+        echo -e "  ${YELLOW}补域名后：x-ui → 18 → 1 申请证书（15 天自动续签），证书装好后订阅系统会自动切到正式证书${PLAIN}"
+    fi
     echo ""
 }
 
