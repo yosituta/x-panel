@@ -90,6 +90,7 @@ auto_install() {
     fi
 
     local use_cert=0
+    # 没给 --domain 就不申请证书，自动按「纯 IP 模式」安装，无需额外写 --no-cert
     if [[ "$A_CERT" == "1" && -n "$A_DOMAIN" ]]; then
         use_cert=1
         if [[ -z "$A_EMAIL" ]]; then
@@ -110,7 +111,7 @@ auto_install() {
     if [[ "$use_cert" == "1" ]]; then
         echo "  HTTPS     : 是，域名 ${A_DOMAIN}（注册邮箱 ${A_EMAIL}，剩余 15 天自动续期）"
     else
-        echo "  HTTPS     : 否（不申请证书）"
+        echo "  HTTPS     : 否 → 纯 IP 模式（未提供 --domain，自动不申请证书）"
     fi
 
     if [[ "$A_DRY" == "1" ]]; then
@@ -193,7 +194,7 @@ auto_install() {
             tail -6 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
         fi
     else
-        echo -e "${green}---- 6/6 跳过证书 ----${plain}"
+        echo -e "${green}---- 6/6 跳过证书（未提供域名，按纯 IP 模式安装）----${plain}"
     fi
 
     # 防火墙
@@ -246,7 +247,10 @@ auto_install() {
     echo "  密码     : ${A_PASS}"
     echo ""
     if [[ "$cert_done" != "1" ]]; then
-        echo -e "${yellow}未启用 HTTPS。要启用：${plain}"
+        echo -e "${yellow}纯 IP 模式：面板地址 https://IP:${A_PORT}${A_PATH}（自签证书，浏览器点“继续访问”）${plain}"
+        echo -e "${yellow}订阅系统：装好后 x-ui → 25 → 1，因无证书会退回 http://IP:8000（功能一致，只是没有 HTTPS）${plain}"
+        echo ""
+        echo -e "${yellow}以后要启用 HTTPS：${plain}"
         echo "  1) 先把域名 A 记录指到本机（建议保持灰云，不要走 CDN）"
         echo "  2) 输入 x-ui → 18 (SSL 证书管理) → 1 (获取证书)"
         echo "  3) 完成后用 https://域名:${A_PORT}${A_PATH}/ 访问"

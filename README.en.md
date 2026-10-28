@@ -44,11 +44,13 @@ Other flags: `--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--
 
 After installation, run `x-ui` for the 30-item management menu (certificates, firewall, subscription system, BBR, line checks, data snapshots and more).
 
-> **No domain?** Add `--no-cert` to run in plain-IP mode (panel on `https://IP:54321` with a self-signed cert — click through the browser warning):
+> **No domain?** Just omit `--domain` — the installer automatically runs in plain-IP mode (panel on `https://IP:54321` with a self-signed cert — click through the browser warning):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto --no-cert
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
 ```
+
+(`--no-cert` still works as an explicit "no certificate" switch; omitting `--domain` already implies it.)
 
 In this mode the subscription system (menu 25) finds no panel certificate and **falls back to `http://IP:8000`** — same features, just without HTTPS.
 Once the domain points at the server and a certificate is issued, run `x-ui → 25 → 1` again and it switches back to `https://your-domain:15268`.

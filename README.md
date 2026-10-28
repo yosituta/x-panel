@@ -44,11 +44,13 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 
 装好后输入 `x-ui` 进入 30 项管理菜单（证书、防火墙、订阅系统、BBR、线路检测、数据快照等）。
 
-> **没有域名？** 加 `--no-cert` 走纯 IP 模式（面板为 `https://IP:54321`，自签证书，浏览器提示"继续访问"即可）：
+> **没有域名？** 直接不写 `--domain` 即可，脚本会自动按纯 IP 模式安装（面板为 `https://IP:54321`，自签证书，浏览器提示"继续访问"即可）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto --no-cert
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto
 ```
+
+（`--no-cert` 仍然可用，写上等于显式声明"不要证书"，效果一样；`--auto` 不带域名时本来就跳过证书。）
 
 此模式下订阅系统（菜单 25）找不到面板证书，会**退回 `http://IP:8000` 直连**，功能完全相同，只是没有 HTTPS；
 之后把域名解析到本机、申请证书，再跑一次 `x-ui → 25 → 1` 就会自动切回 `https://你的域名:15268`。
