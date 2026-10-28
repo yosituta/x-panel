@@ -44,7 +44,23 @@ Other flags: `--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--
 
 After installation, run `x-ui` for the 30-item management menu (certificates, firewall, subscription system, BBR, line checks, data snapshots and more).
 
+> **No domain?** Add `--no-cert` to run in plain-IP mode (panel on `https://IP:54321` with a self-signed cert — click through the browser warning):
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/install.sh) --auto --no-cert
+```
+
+In this mode the subscription system (menu 25) finds no panel certificate and **falls back to `http://IP:8000`** — same features, just without HTTPS.
+Once the domain points at the server and a certificate is issued, run `x-ui → 25 → 1` again and it switches back to `https://your-domain:15268`.
+
 Full deployment guide (domain layout, multiple servers, upgrades, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
+
+### Ports and ordering
+
+- Batch-deployed nodes get **random** ports in **40000-65000** (unique per batch) instead of incrementing from 20000
+- If you pass an explicit start port, ports are allocated sequentially from it
+- The inbound list is ordered by **creation order (ascending ID)**, not by port number
+
 
 ## Features
 

@@ -118,7 +118,9 @@ EOF
         write_nginx "$cert" "$domain"
         echo "  已用证书: $cert（域名 $domain）"
     else
-        echo -e "  ${YELLOW}未找到面板证书，跳过 HTTPS 反代；请先在 x-ui 菜单 18 申请证书后重跑本脚本${PLAIN}"
+        echo -e "  ${YELLOW}未找到面板证书，跳过 HTTPS 反代，改用 http://IP:${BACKEND} 直连${PLAIN}"
+        echo -e "  ${YELLOW}（功能完全相同，只是没有 HTTPS；申请证书后重跑本脚本即可切到 ${PORT}）${PLAIN}"
+        allow_port "$BACKEND"
     fi
 
     echo "---- 4/5 防火墙 ----"

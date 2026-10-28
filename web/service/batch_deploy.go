@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/url"
 	"strings"
@@ -45,13 +46,15 @@ const (
 	PresetXHTTPReality  = "xhttp-reality"  // VLESS + XHTTP + Reality（无需证书，抗封锁更强）
 	PresetTLSEncryption = "tls-encryption" // VLESS 加密 + XHTTP + TLS（可套 CDN）
 
-	DefaultBatchCount   = 10
-	DefaultBatchPrefix  = "reality"
-	DefaultFingerprint  = "chrome"
-	DefaultSpiderX      = "/"
-	defaultBatchPort    = 20000 // 未指定时的默认起始端口
-	minUsablePort       = 1024  // 允许用户指定 1024 起的端口（如 2053 / 443 之外的常用端口）
-	maxBatchPort        = 60000
+	DefaultBatchCount  = 10
+	DefaultBatchPrefix = "reality"
+	DefaultFingerprint = "chrome"
+	DefaultSpiderX     = "/"
+	// 未指定端口时，在 40000-65000 之间随机取：连续递增的端口容易被扫描，也不像「有规律」
+	minAutoPort         = 40000
+	maxAutoPort         = 65000
+	minUsablePort       = 1024 // 允许用户指定 1024 起的端口（如 2053 / 443 之外的常用端口）
+	maxBatchPort        = 65000
 	batchPortMaxRetries = 4096
 )
 
@@ -181,6 +184,16 @@ func defaultXhttpSettings(path, mode string) map[string]any {
 		"scStreamUpServerSecs": "20-80",
 		"xPaddingBytes":        "100-1000",
 	}
+}
+
+// randomBatchPort 在高位区间内取一个随机端口（40000-65000）
+func randomBatchPort() int {
+	span := int64(maxAutoPort - minAutoPort + 1)
+	n, err := rand.Int(rand.Reader, big.NewInt(span))
+	if err != nil {
+		return minAutoPort
+	}
+	return minAutoPort + int(n.Int64())
 }
 
 func portAvailable(port int) bool {
@@ -683,18 +696,23 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		}
 	}
 
+	// 端口策略：
+	//   1. 用户显式指定 startPort → 从该端口起顺序分配（尊重用户）
+	//   2. CDN 模式 → 只能用 Cloudflare 回源端口（443/2053/2083/2087/2096/8443）
+	//   3. 其余情况 → 每条都从 40000-65000 中随机取，互不重复（不连续、无规律）
 	port := o.StartPort
-	if port < minUsablePort || port > maxBatchPort {
-		port = defaultBatchPort
+	sequential := port >= minUsablePort && port <= maxBatchPort
+	if !sequential {
+		port = 0
 	}
 
-	// CDN 模式下入站端口必须是 Cloudflare 支持的回源端口，否则 CDN 转发不到
 	if cdnBehind && o.StartPort == 0 {
 		var probe InboundService
 		for _, p := range CDNPorts() {
 			existed, _ := probe.checkPortExist(o.Listen, p, 0)
 			if !existed && portAvailable(p) {
 				port = p
+				sequential = true // CDN 端口表本身有限，按表顺序取
 				break
 			}
 		}
@@ -702,29 +720,35 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 
 	var inboundService InboundService
 	needRestart := false
-	attempts := 0
+	usedPorts := make(map[int]bool)
 
 	for i := 0; i < o.Count; i++ {
-		for {
-			if attempts > batchPortMaxRetries {
-				result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: 找不到可用端口", i+1))
-				attempts = 0
-				break
-			}
+		attempts := 0
+		picked := false
+		for attempts <= batchPortMaxRetries {
 			attempts++
-			existed, _ := inboundService.checkPortExist(o.Listen, port, 0)
-			if !existed && portAvailable(port) {
-				break
+			cand := port
+			if !sequential {
+				cand = randomBatchPort()
 			}
-			port++
-			if port > 65535 {
-				result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: 端口已用尽", i+1))
-				attempts = batchPortMaxRetries + 1
-				break
+			if !usedPorts[cand] {
+				existed, _ := inboundService.checkPortExist(o.Listen, cand, 0)
+				if !existed && portAvailable(cand) {
+					port = cand
+					usedPorts[cand] = true
+					picked = true
+					break
+				}
+			}
+			if sequential {
+				port++
+				if port > maxBatchPort {
+					port = minUsablePort
+				}
 			}
 		}
-		if attempts > batchPortMaxRetries {
-			attempts = 0
+		if !picked {
+			result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: 找不到可用端口", i+1))
 			continue
 		}
 
@@ -733,7 +757,9 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		if err != nil {
 			logger.Warningf("批量部署第 %d 条组装失败: %v", i+1, err)
 			result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条: %v", i+1, err))
-			port++
+			if sequential {
+				port++
+			}
 			continue
 		}
 
@@ -741,7 +767,9 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 		if err != nil {
 			logger.Warningf("批量部署第 %d 条失败: %v", i+1, err)
 			result.Failed = append(result.Failed, fmt.Sprintf("第 %d 条(端口 %d): %v", i+1, port, err))
-			port++
+			if sequential {
+				port++
+			}
 			continue
 		}
 		if restart {
@@ -756,7 +784,9 @@ func (s *BatchDeployService) Deploy(o *BatchDeployOptions) (*BatchDeployResult, 
 			}
 		}
 		result.Created = append(result.Created, *deployed)
-		port++
+		if sequential {
+			port++
+		}
 	}
 
 	result.Restarted = needRestart
