@@ -1,40 +1,38 @@
 #!/bin/sh
-case $1 in
+# ============================================================
+# 构建阶段：下载并放置 Xray 内核
+#   用法：DockerInit.sh <TARGETARCH> <XRAY_VERSION>
+#   TARGETARCH: amd64 / arm64
+# ============================================================
+set -e
+
+TARGET_ARCH="${1:-amd64}"
+XRAY_VERSION="${2:-v25.9.11}"
+
+case "${TARGET_ARCH}" in
     amd64)
-        ARCH="64"
+        XRAY_ARCH="64"
         FNAME="amd64"
         ;;
-    i386)
-        ARCH="32"
-        FNAME="i386"
-        ;;
-    armv8 | arm64 | aarch64)
-        ARCH="arm64-v8a"
+    arm64 | aarch64 | armv8)
+        XRAY_ARCH="arm64-v8a"
         FNAME="arm64"
         ;;
-    armv7 | arm | arm32)
-        ARCH="arm32-v7a"
-        FNAME="arm32"
-        ;;
-    armv6)
-        ARCH="arm32-v6"
-        FNAME="armv6"
-        ;;
     *)
-        ARCH="64"
-        FNAME="amd64"
+        echo "不支持的架构: ${TARGET_ARCH}" >&2
+        exit 1
         ;;
 esac
+
 mkdir -p build/bin
 cd build/bin
-curl -sfLRO "https://github.com/XTLS/Xray-core/releases/download/v26.9.9/Xray-linux-${ARCH}.zip"
-unzip "Xray-linux-${ARCH}.zip"
-rm -f "Xray-linux-${ARCH}.zip" geoip.dat geosite.dat
+
+URL="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip"
+echo "下载 Xray 内核: ${URL}"
+curl -fsSL --retry 3 -o xray.zip "${URL}"
+unzip -q xray.zip
+rm -f xray.zip geoip.dat geosite.dat
 mv xray "xray-linux-${FNAME}"
-wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-wget -q -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
-wget -q -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
-wget -q -O geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
-wget -q -O geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
-cd ../../
+chmod +x "xray-linux-${FNAME}"
+
+echo "已放置: build/bin/xray-linux-${FNAME} ($(./"xray-linux-${FNAME}" -version 2>/dev/null | head -1))"

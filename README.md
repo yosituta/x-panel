@@ -66,6 +66,25 @@ bash install.sh --auto --domain panel1.example.com --dry-run
 
 完整部署说明（域名规划、多台批量、升级回滚、排错）：[docs/DEPLOY.md](docs/DEPLOY.md)
 
+
+## Docker 部署
+
+不想装 systemd 那一套，可以用容器跑：
+
+```bash
+git clone https://github.com/yosituta/x-panel.git
+cd x-panel && mkdir -p db cert
+docker compose up -d --build
+```
+
+访问 `https://服务器IP:54321`，账号 `admin` / `123456`（登录后立即修改）。
+
+- 镜像固定 Xray **v25.9.11**（Reality 兼容性，勿上调）
+- 必须 `network_mode: host`，节点端口才能直接占用
+- 容器内没有 systemd/ufw/nginx，**证书、防火墙、订阅系统**需要在宿主机处理
+
+完整说明（配置项、证书挂载、升级备份、排错）：[docs/DOCKER.md](docs/DOCKER.md)
+
 ### 端口与排序
 
 - 批量部署节点时，端口在 **40000-65000** 之间**随机**分配（互不重复），不再从 20000 递增，避免被顺序扫描

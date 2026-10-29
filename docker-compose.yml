@@ -2,15 +2,38 @@ services:
   x-panel:
     build:
       context: .
-      dockerfile: ./Dockerfile
-    container_name: x-panel_app
-    # hostname: yourhostname <<--- optional
-    volumes:
-      - $PWD/db/:/etc/x-ui/
-      - $PWD/cert/:/root/cert/
-    environment:
-      XRAY_VMESS_AEAD_FORCED: "false"
-      XUI_ENABLE_FAIL2BAN: "true"
-    tty: true
-    network_mode: host
+      args:
+        # 与 release.yml 保持一致，勿随意上调（见 CHANGELOG 的 Reality 兼容性说明）
+        XRAY_VERSION: v25.9.11
+    image: x-panel:latest
+    container_name: x-panel
     restart: unless-stopped
+
+    # 节点需要直接占用宿主端口（443/2053/高位随机端口），必须用 host 网络。
+    # 用 host 网络时下面的 ports 段会被忽略，面板端口由 XUI_PORT 决定。
+    network_mode: host
+
+    environment:
+      XUI_PORT: "54321"
+      XUI_USERNAME: "admin"
+      XUI_PASSWORD: "123456"
+      XUI_WEB_BASE_PATH: "/"
+      # 挂载了证书后可填域名，启动时自动绑定（/root/cert/<域名>/）
+      # XUI_CERT_DOMAIN: "panel1.example.com"
+      TZ: Asia/Shanghai
+
+    volumes:
+      # 面板数据（SQLite、设置），务必持久化，否则重建容器会丢配置
+      - ./db:/etc/x-ui
+      # 证书目录，与宿主机 acme.sh / certbot 的产物对接
+      - ./cert:/root/cert
+
+    # 需要容器内改防火墙时才加（多数情况建议在宿主机放行端口）
+    # cap_add:
+    #   - NET_ADMIN
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

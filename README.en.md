@@ -66,6 +66,24 @@ Other flags: `--panel-port` / `--path` / `--user` / `--pass` / `--no-cert` / `--
 
 Full deployment guide (domain layout, multiple servers, upgrades, troubleshooting): [docs/DEPLOY.md](docs/DEPLOY.md)
 
+## Docker
+
+If you would rather not install the systemd stack:
+
+```bash
+git clone https://github.com/yosituta/x-panel.git
+cd x-panel && mkdir -p db cert
+docker compose up -d --build
+```
+
+Open `https://SERVER_IP:54321`, user `admin` / `123456` (change it right away).
+
+- The image pins Xray **v25.9.11** (Reality compatibility — do not bump)
+- `network_mode: host` is required so node ports bind directly
+- The container has no systemd/ufw/nginx: **certificates, firewall and the subscription system** are handled on the host
+
+Full guide (env vars, mounting certificates, upgrades, troubleshooting): [docs/DOCKER.md](docs/DOCKER.md)
+
 ### Ports and ordering
 
 - Batch-deployed nodes get **random** ports in **40000-65000** (unique per batch) instead of incrementing from 20000
