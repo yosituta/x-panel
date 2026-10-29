@@ -75,7 +75,7 @@ issue_cert() {
 
     echo "  正在签发证书（占用 80 端口，nginx 暂停约 20 秒）..."
     systemctl stop nginx >/dev/null 2>&1
-    if ~/.acme.sh/acme.sh --issue -d "$domain" --standalone --days 15 --force >/tmp/sublinkpro-acme.log 2>&1; then
+    if ~/.acme.sh/acme.sh --issue -d "$domain" --standalone --days 75 --force >/tmp/sublinkpro-acme.log 2>&1; then
         mkdir -p "/root/cert/${domain}"
         ~/.acme.sh/acme.sh --install-cert -d "$domain" \
             --key-file "/root/cert/${domain}/privkey.pem" \

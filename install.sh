@@ -175,8 +175,8 @@ auto_install() {
     if [[ "$use_cert" == "1" ]]; then
         echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
         /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
-        # --days 15：证书剩余 15 天时自动续期；acme.sh 自带 cron 任务
-        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 15 --force >/tmp/xp-acme.log 2>&1; then
+        # --days 75：证书剩余 15 天时自动续期；acme.sh 自带 cron 任务
+        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 75 --force >/tmp/xp-acme.log 2>&1; then
             mkdir -p "/root/cert/${A_DOMAIN}"
             /root/.acme.sh/acme.sh --install-cert -d "$A_DOMAIN" --ecc \
                 --key-file "/root/cert/${A_DOMAIN}/privkey.pem" \

@@ -978,7 +978,7 @@ ssl_cert_issue_standalone_embedded() {
     systemctl stop nginx >/dev/null 2>&1
     systemctl stop "${SERVICE_NAME}" >/dev/null 2>&1
     
-    if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --days 15 --force; then
+    if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --days 75 --force; then
         LOGE "❌ 证书申请失败！"
         LOGE "请检查：1、域名解析是否正确指向本机 IP。2、80 端口是否开放且未被占用。"
         # 失败尝试重启 x-ui
@@ -1380,7 +1380,7 @@ ssl_cert_issue() {
     # 签发证书
     echo ""
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --days 15 --force
+    ~/.acme.sh/acme.sh --issue -d ${domain} --listen-v6 --standalone --httpport ${WebPort} --days 75 --force
     if [ $? -ne 0 ]; then
         LOGE "签发证书失败，请检查日志。"
         rm -rf ~/.acme.sh/${domain}
@@ -1510,7 +1510,7 @@ ssl_cert_issue_CF() {
 
         # 使用 Cloudflare DNS 颁发证书
         echo ""
-        ~/.acme.sh/acme.sh --issue --dns dns_cf -d ${CF_Domain} -d *.${CF_Domain} --days 15 --log --force
+        ~/.acme.sh/acme.sh --issue --dns dns_cf -d ${CF_Domain} -d *.${CF_Domain} --days 75 --log --force
         if [ $? -ne 0 ]; then
             LOGE "证书颁发失败，脚本正在退出..."
             exit 1
