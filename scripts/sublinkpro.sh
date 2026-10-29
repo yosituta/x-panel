@@ -313,6 +313,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 ACTION="${ARGS[0]:-install}"
+# domain 子命令支持位置写法：`sublinkpro.sh domain sub.example.com --port 8443`
+if [ "$ACTION" = "domain" ] && [ -z "$CLI_DOMAIN" ] && [ -n "${ARGS[1]}" ]; then
+    CLI_DOMAIN="${ARGS[1]}"
+fi
 
 case "$ACTION" in
     install)   do_install ;;
