@@ -178,26 +178,35 @@ update() {
 
 update_menu() {
     echo -e "${yellow}更新菜单项${plain}"
-    confirm "此功能会将所有菜单项更新为最新显示状态" "y"
+    confirm "此功能会把 x-ui 菜单脚本更新为最新版本" "y"
     if [[ $? != 0 ]]; then
         LOGE "Cancelled"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
         return 0
     fi
-    
-    wget --no-check-certificate -O /usr/bin/x-ui https://raw.githubusercontent.com/${X_PANEL_REPO}/main/x-ui.sh
-    chmod +x /usr/local/x-ui/x-ui.sh
-    chmod +x /usr/bin/x-ui
-    
-     if [[ $? == 0 ]]; then
-        echo -e "${green}更新成功，面板已自动重启${plain}"
-        exit 0
+
+    local url="https://raw.githubusercontent.com/${X_PANEL_REPO}/main/x-ui.sh"
+    local tmp="/tmp/x-ui.menu.new"
+    echo "  正在下载：$url"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --max-time 60 -o "$tmp" "$url" || { LOGE "下载失败，检查网络后重试"; return 1; }
     else
-        echo -e "${red}更新菜单项失败${plain}"
+        wget --no-check-certificate -q -O "$tmp" "$url" || { LOGE "下载失败，检查网络后重试"; return 1; }
+    fi
+
+    if ! bash -n "$tmp" 2>/dev/null; then
+        LOGE "下载到的脚本语法有误，已放弃更新"
+        rm -f "$tmp"
         return 1
     fi
+
+    install -m 755 "$tmp" /usr/bin/x-ui
+    for f in /usr/local/x-ui/x-ui.sh /opt/x-panel/x-ui.sh; do
+        [ -f "$f" ] && install -m 755 "$tmp" "$f"
+    done
+    rm -f "$tmp"
+
+    echo -e "${green}菜单已更新（$(stat -c%s /usr/bin/x-ui) 字节）${plain}"
+    echo "  重新执行 x-ui 即可看到新菜单，例如 25 → 4 绑定订阅系统域名"
 }
 
 custom_version() {
@@ -2122,7 +2131,8 @@ show_menu() {
         check_install && update
         ;;
     3)
-        check_install && update_menu
+        # 仅替换菜单脚本本身，不依赖面板是否已安装
+        update_menu
         ;;
     4)
         check_install && custom_version
