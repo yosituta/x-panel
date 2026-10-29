@@ -219,6 +219,9 @@ docs/                roadmap, analysis notes
 **Reality nodes show a good ping but pages do not load.**
 If the server log says `REALITY: authentication failed`, the client's Reality implementation is incompatible with xray (observed with some Shadowrocket builds). Switch to the `auto` or `TLS` preset — this is not a server misconfiguration.
 
+**Typing the address without http/https doesn't load?**
+No prefix needed. The panel detects it: with a certificate configured, a plain `http://` request returns `308` to the same URL over `https://`; without a certificate it is served over `http://` directly. After one visit by domain, HSTS makes the browser use https from then on.
+
 **Subscription URLs contain 127.0.0.1.**
 Address resolution order: subscription domain → panel certificate directory name → machine hostname. Set "subscription domain" in settings, or open the panel by domain rather than IP.
 
