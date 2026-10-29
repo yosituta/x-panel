@@ -1607,13 +1607,20 @@ subconverter() {
     echo -e "  ${green}1.${plain} 订阅系统安装/修复     —— 安装 SublinkPro，或用面板证书修复 nginx 反代"
     echo -e "  ${green}2.${plain} 订阅系统状态查看       —— 服务状态、端口监听、防火墙放行情况"
     echo -e "  ${green}3.${plain} 订阅系统卸载           —— 停止服务并清理配置（数据目录一并删除）"
+    echo -e "  ${green}4.${plain} 订阅系统绑定独立域名   —— 如 sub.你的域名，申请证书后可用 https://sub.域名:端口 登录"
     echo -e "  ${green}0.${plain} 返回主菜单"
     echo ""
-    read -p "请选择 [0-3]: " c
+    read -p "请选择 [0-4]: " c
     case "$c" in
         1) run_repo_script sublinkpro.sh install ;;
         2) run_repo_script sublinkpro.sh status ;;
         3) run_repo_script sublinkpro.sh uninstall ;;
+        4)
+            read -p "请输入订阅系统域名（如 sub.example.com）: " slp_domain
+            read -p "端口 [8443]（443/2053 被节点占用时用 8443）: " slp_port
+            slp_port=${slp_port:-8443}
+            run_repo_script sublinkpro.sh install --domain "$slp_domain" --port "$slp_port"
+            ;;
         *) return ;;
     esac
 }
