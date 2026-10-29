@@ -228,6 +228,7 @@ EOF
     # 独立域名：有就签证书并加成第二个 server 块
     if [ -n "$SUB_DOMAIN" ]; then
         echo "  独立域名：${SUB_DOMAIN}:${SUB_PORT}"
+        save_domain_conf
         issue_cert "$SUB_DOMAIN" "" || true
         allow_port "$SUB_PORT"
     fi
@@ -265,6 +266,7 @@ EOF
 
 do_domain() {
     need_root
+    load_domain_conf
     [ -z "$SUB_DOMAIN" ] && { echo -e "${RED}用法: $0 domain sub.example.com [--port 8443]${PLAIN}"; return 1; }
     echo -e "${GREEN}==== 绑定独立域名 ${SUB_DOMAIN}:${SUB_PORT} ====${PLAIN}"
     issue_cert "$SUB_DOMAIN" "" || return 1
