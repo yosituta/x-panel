@@ -232,8 +232,8 @@ uninstall() {
         fi
         return 0
     fi
-    systemctl stop x-ui
-    systemctl disable x-ui
+    systemctl stop "${SERVICE_NAME}"
+    systemctl disable "${SERVICE_NAME}"
     rm /etc/systemd/system/x-ui.service -f
     systemctl daemon-reload
     systemctl reset-failed
@@ -289,7 +289,7 @@ reset_webbasepath() {
     
     # Apply the new web base path setting
     /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}" >/dev/null 2>&1
-    systemctl restart x-ui
+    systemctl restart "${SERVICE_NAME}"
     
     # Display confirmation message
     echo -e "面板访问路径已重置为: ${green}${config_webBasePath}${plain}"
@@ -394,7 +394,7 @@ start() {
         echo ""
         LOGI "面板正在运行，无需再次启动，如需重新启动，请选择重新启动"
     else
-        systemctl start x-ui
+        systemctl start "${SERVICE_NAME}"
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
@@ -415,7 +415,7 @@ stop() {
         echo ""
         LOGI "面板已关闭，无需再次关闭！"
     else
-        systemctl stop x-ui
+        systemctl stop "${SERVICE_NAME}"
         sleep 2
         check_status
         if [[ $? == 1 ]]; then
@@ -431,7 +431,7 @@ stop() {
 }
 
 restart() {
-    systemctl restart x-ui
+    systemctl restart "${SERVICE_NAME}"
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
@@ -445,14 +445,14 @@ restart() {
 }
 
 status() {
-    systemctl status x-ui -l
+    systemctl status "${SERVICE_NAME}" -l
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
 }
 
 enable() {
-    systemctl enable x-ui
+    systemctl enable "${SERVICE_NAME}"
     if [[ $? == 0 ]]; then
         LOGI "x-ui 已成功设置开机启动"
     else
@@ -465,7 +465,7 @@ enable() {
 }
 
 disable() {
-    systemctl disable x-ui
+    systemctl disable "${SERVICE_NAME}"
     if [[ $? == 0 ]]; then
         LOGI "x-ui 已成功取消开机启动"
     else
@@ -578,12 +578,27 @@ update_shell() {
 }
 
 # 0: running, 1: not running, 2: not installed
+# ---- 服务名自动识别：不同安装方式可能叫 x-ui / x-panel，避免误报“未安装” ----
+SERVICE_NAME=""
+detect_service() {
+    local s
+    for s in x-ui x-panel 3x-ui; do
+        if [[ -f "/etc/systemd/system/${s}.service" ]]; then
+            SERVICE_NAME="${s}"
+            return 0
+        fi
+    done
+    SERVICE_NAME="x-ui"
+    return 1
+}
+detect_service >/dev/null 2>&1 || true
+
 check_status() {
-    if [[ ! -f /etc/systemd/system/x-ui.service ]]; then
+    # 没有任何面板单元文件 → 未安装
+    if ! detect_service; then
         return 2
     fi
-    temp=$(systemctl status x-ui | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
-    if [[ "${temp}" == "running" ]]; then
+    if [[ "$(systemctl is-active "${SERVICE_NAME}" 2>/dev/null)" == "active" ]]; then
         return 0
     else
         return 1
@@ -591,8 +606,8 @@ check_status() {
 }
 
 check_enabled() {
-    temp=$(systemctl is-enabled x-ui)
-    if [[ "${temp}" == "enabled" ]]; then
+    detect_service >/dev/null 2>&1
+    if [[ "$(systemctl is-enabled "${SERVICE_NAME}" 2>/dev/null)" == "enabled" ]]; then
         return 0
     else
         return 1
@@ -792,7 +807,7 @@ update_geo() {
         mkdir -p ${binFolder}
     fi
 
-    systemctl stop x-ui
+    systemctl stop "${SERVICE_NAME}"
     cd ${binFolder}
     rm -f geoip.dat geosite.dat geoip_IR.dat geosite_IR.dat geoip_VN.dat geosite_VN.dat
     wget -N https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
@@ -801,7 +816,7 @@ update_geo() {
     wget -O geosite_IR.dat -N https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
     wget -O geoip_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geoip.dat
     wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
-    systemctl start x-ui
+    systemctl start "${SERVICE_NAME}"
     echo -e "${green}Geosite.dat + Geoip.dat + geoip_IR.dat + geosite_IR.dat 在 bin 文件夹: '${binfolder}' 中已经更新成功 !${plain}"
     before_show_menu
 }
@@ -952,13 +967,13 @@ ssl_cert_issue_standalone_embedded() {
     LOGI "正在使用 Standalone 模式申请证书 (占用 80 端口)..."
     # 如果 80 端口被 nginx 或 x-ui 占用，先尝试停止它们
     systemctl stop nginx >/dev/null 2>&1
-    systemctl stop x-ui >/dev/null 2>&1
+    systemctl stop "${SERVICE_NAME}" >/dev/null 2>&1
     
     if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --days 15 --force; then
         LOGE "❌ 证书申请失败！"
         LOGE "请检查：1、域名解析是否正确指向本机 IP。2、80 端口是否开放且未被占用。"
         # 失败尝试重启 x-ui
-        systemctl start x-ui >/dev/null 2>&1
+        systemctl start "${SERVICE_NAME}" >/dev/null 2>&1
         return 1
     fi
 
@@ -971,8 +986,8 @@ ssl_cert_issue_standalone_embedded() {
     
     LOGI "申请成功！正在安装证书到: $certPath"
     
-    # x-ui 是系统服务，用 systemctl restart x-ui 更稳妥
-    local reloadCmd="systemctl restart x-ui" 
+    # x-ui 是系统服务，用 systemctl restart "${SERVICE_NAME}" 更稳妥
+    local reloadCmd="systemctl restart "${SERVICE_NAME}"" 
     
     ~/.acme.sh/acme.sh --installcert -d $DOMAIN \
         --key-file       "${certPath}/privkey.pem" \
@@ -1024,18 +1039,18 @@ ssl_cert_issue_standalone_embedded() {
             if command -v restart >/dev/null 2>&1; then
                 restart
             else
-                systemctl restart x-ui
+                systemctl restart "${SERVICE_NAME}"
             fi
         else
             LOGE "❌ 严重错误：证书安装显示成功，但未找到证书文件或文件为空！"
             LOGE "请检查目录权限或磁盘空间：$certPath"
             # 恢复 x-ui 运行，避免断联
-            systemctl start x-ui >/dev/null 2>&1
+            systemctl start "${SERVICE_NAME}" >/dev/null 2>&1
             return 1
         fi
     else
         LOGE "证书安装步骤失败，请检查日志。"
-        systemctl start x-ui >/dev/null 2>&1
+        systemctl start "${SERVICE_NAME}" >/dev/null 2>&1
     fi
 }
 
@@ -1367,8 +1382,8 @@ ssl_cert_issue() {
 
     # --- 自动设置 reloadCmd ---
     echo ""
-    reloadCmd="systemctl restart x-ui"
-    LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart x-ui"
+    reloadCmd="systemctl restart "${SERVICE_NAME}""
+    LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart "${SERVICE_NAME}""
     
     # 安装证书
     echo ""
@@ -1509,8 +1524,8 @@ ssl_cert_issue_CF() {
 
         # --- 自动设置 reloadCmd ---
         echo ""
-        reloadCmd="systemctl restart x-ui"
-        LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart x-ui"
+        reloadCmd="systemctl restart "${SERVICE_NAME}""
+        LOGI "ACME 的 --reloadcmd 已自动设置为: ${yellow}systemctl restart "${SERVICE_NAME}""
         echo ""
 
         # 执行“安装证书”流程
