@@ -194,7 +194,32 @@ auto_install() {
             tail -6 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
         fi
     else
-        echo -e "${green}---- 6/6 跳过证书（未提供域名，按纯 IP 模式安装）----${plain}"
+        echo -e "${green}---- 6/6 未提供域名，生成自签证书（纯 IP 模式）----${plain}"
+        # 自签证书：仍然是 HTTPS，浏览器会提示"不安全"，点继续即可；
+        # 好处是面板密码不会明文传输，且"http:// 自动跳 https"逻辑照样生效。
+        local self_signed=0
+        local self_dir="/root/cert/selfsigned"
+        mkdir -p "$self_dir"
+        local self_ip
+        self_ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
+        [ -z "$self_ip" ] && self_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        [ -z "$self_ip" ] && self_ip="127.0.0.1"
+        if [ ! -s "$self_dir/fullchain.pem" ]; then
+            openssl req -x509 -nodes -newkey rsa:2048 \
+                -keyout "$self_dir/privkey.pem" -out "$self_dir/fullchain.pem" \
+                -days 3650 -subj "/CN=${self_ip}" >/dev/null 2>&1 && \
+                chmod 600 "$self_dir/privkey.pem"
+        fi
+        if [ -s "$self_dir/fullchain.pem" ]; then
+            ./x-ui setting -webCert "$self_dir/fullchain.pem" \
+                           -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
+            cert_done=1
+            self_signed=1
+            echo "  已生成自签证书：$self_dir（有效期 10 年，CN=${self_ip}）"
+            echo "  以后申请正式证书：x-ui → 18 → 1，会自动替换，无需重装"
+        else
+            echo -e "${yellow}  自签证书生成失败，面板将以 http 方式提供${plain}"
+        fi
     fi
 
     # 防火墙
@@ -246,13 +271,18 @@ auto_install() {
     echo "  用户名   : ${A_USER}"
     echo "  密码     : ${A_PASS}"
     echo ""
-    if [[ "$cert_done" != "1" ]]; then
-        echo -e "${yellow}纯 IP 模式：面板地址 https://IP:${A_PORT}${A_PATH}（自签证书，浏览器点“继续访问”）${plain}"
-        echo -e "${yellow}订阅系统：装好后 x-ui → 25 → 1，因无证书会退回 http://IP:8000（功能一致，只是没有 HTTPS）${plain}"
+    if [[ "${self_signed:-0}" == "1" ]]; then
+        echo -e "${yellow}当前使用自签证书（纯 IP 模式）：浏览器提示“不安全”时点“继续访问”即可${plain}"
+        echo -e "${yellow}订阅系统：x-ui → 25 → 1，会用自签证书运行在 https://IP:15268${plain}"
         echo ""
-        echo -e "${yellow}以后要启用 HTTPS：${plain}"
-        echo "  1) 先把域名 A 记录指到本机（建议保持灰云，不要走 CDN）"
-        echo "  2) 输入 x-ui → 18 (SSL 证书管理) → 1 (获取证书)"
+        echo -e "${yellow}以后换成正式证书（任选其一，都不用重装）：${plain}"
+        echo "  · 有域名      ：x-ui → 18 → 1   申请 Let's Encrypt（剩余 15 天自动续签）"
+        echo "  · 域名在 CF  ：x-ui → 18 → 8   用 Cloudflare 源站证书（15 年免续签）"
+        echo ""
+    elif [[ "$cert_done" != "1" ]]; then
+        echo -e "${yellow}未启用 HTTPS（面板暂时是 http）：${plain}"
+        echo "  1) 域名 A 记录指到本机（建议灰云）"
+        echo "  2) x-ui → 18 → 1 申请证书"
         echo "  3) 完成后用 https://域名:${A_PORT}${A_PATH}/ 访问"
         echo ""
     fi
