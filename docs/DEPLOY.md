@@ -194,6 +194,64 @@ https://面板域名:15268/            ← 原入口保留，两个都能用
 
 前提：`sub.example.com` 的 A 记录要先指向本机 IP，80 端口可达（签发证书要用）。
 
+## 用 Cloudflare 源站证书（15 年，不用续签）
+
+域名托管在 Cloudflare 的话，可以不用 Let's Encrypt，直接用 **Origin CA 证书**：有效期最长 15 年，
+不用管续签，Cloudflare 回源时天然信任。
+
+代价是三个前提，缺一不可：
+
+1. **域名必须开橙云（Proxied）** —— Origin 证书只被 Cloudflare 信任，浏览器直连源站会报"证书不受信任"
+2. **面板端口必须是 CF 支持的回源端口** —— `443 / 2053 / 2083 / 2087 / 2096 / 8443`；
+   默认的 `54321` 不在白名单里，开橙云后浏览器连不上，得先把面板改到 `8443`
+3. **灰云 / IP 直连会失效** —— 这是原厂证书的固有行为，不是配置错误
+
+### 操作
+
+```
+x-ui → 18（SSL 证书管理）→ 8（Cloudflare 源站证书）
+```
+
+两种方式：
+
+- **1. 粘贴证书**（推荐，最稳）
+  控制台 `SSL/TLS → Origin Server → Create Certificate`，填域名、有效期选 15 年，
+  把 `Origin Certificate` 和 `Private Key` 分别粘进去，输入 `END` 结束。
+  脚本会校验私钥与证书是否配对，再写入 `/root/cert/<域名>/` 并重启面板。
+- **2. 用凭据自动签发**
+  需要 Cloudflare 凭据，二选一：
+  - **Origin CA Key**：控制台 `SSL/TLS → Origin Server` 页面可见
+  - **API Token**：权限 `Zone → SSL and Certificates → Edit`
+
+凭据保存在 `/root/cert/../.cf-originca`（600 权限），下次不用再输。
+
+### 面板端口怎么改到 8443
+
+```
+x-ui → 9（修改面板端口）→ 输入 8443
+```
+
+改完记得在 Cloudflare 把 `panel1.example.com` 开橙云，然后访问 `https://panel1.example.com:8443`。
+（`8443` 在 CF 白名单内，橙云能正常回源。）
+
+### 订阅系统也能用这张证书
+
+```bash
+bash /usr/local/x-ui/scripts/cfcert.sh paste sub.example.com --target sub
+```
+
+它会把证书写到 `/root/cert/sub.example.com/`，再重配订阅系统的 nginx 指向它。
+
+### 与 Let's Encrypt 怎么选
+
+| | Cloudflare Origin（15 年） | Let's Encrypt（90 天） |
+| --- | --- | --- |
+| 续签 | 不需要 | 到期前 15 天自动续 |
+| 必须开橙云 | ✅ | ❌ 灰云也能用 |
+| 直连 IP 可用 | ❌ | ✅ |
+| 端口限制 | 必须 CF 白名单端口 | 无 |
+| 适用 | 面板/订阅系统全走 CF | 想直连、想减少依赖 |
+
 ### 端口分配与排序
 
 - 批量部署：端口在 **40000-65000** 随机取，同一批内不重复
