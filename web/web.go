@@ -242,6 +242,20 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 			c.Header("Cache-Control", "max-age=31536000")
 		}
 	})
+	// 【开源增强】HTTPS 页面下发 HSTS：域名访问时，浏览器以后即使输入 http:// 也会自己升级到 https://
+	// IP 访问不加（HSTS 规范不允许用于 IP，加了也会被忽略）
+	engine.Use(func(c *gin.Context) {
+		if c.Request.TLS != nil {
+			host := c.Request.Host
+			if h, _, err := net.SplitHostPort(host); err == nil {
+				host = h
+			}
+			if net.ParseIP(host) == nil && host != "" {
+				c.Header("Strict-Transport-Security", "max-age=31536000")
+			}
+		}
+		c.Next()
+	})
 
 	// init i18n
 	err = locale.InitLocalizer(i18nFS, &s.settingService)
