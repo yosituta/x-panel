@@ -88,6 +88,10 @@ jobs:
           # 菜单 25/27/28/29 依赖这些脚本，必须随包分发
           cp -r scripts stage/x-ui/scripts
           cp xraydl/xray "stage/x-ui/bin/xray-linux-${{ matrix.arch }}"
+          # Xray 默认路由规则引用 geoip:private，缺 geoip.dat 会启动失败并无限重启
+          # 官方 zip 里自带这两个文件，必须一起打包
+          cp xraydl/geoip.dat stage/x-ui/bin/geoip.dat
+          cp xraydl/geosite.dat stage/x-ui/bin/geosite.dat
           chmod +x stage/x-ui/x-ui stage/x-ui/x-ui.sh stage/x-ui/scripts/*.sh stage/x-ui/bin/xray-linux-${{ matrix.arch }}
           cd stage && tar -czf "../x-ui-linux-${{ matrix.arch }}.tar.gz" x-ui
           cd .. && ls -lh x-ui-linux-*.tar.gz

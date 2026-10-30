@@ -86,8 +86,9 @@ bind_panel() {
     done
     [ -z "$bin" ] && { echo -e "${RED}未找到面板二进制${PLAIN}"; return 1; }
 
-    "$bin" setting -webCert "${CERT_DIR}/${domain}/fullchain.pem" \
-                   -webCertKey "${CERT_DIR}/${domain}/privkey.pem" >/dev/null 2>&1 || {
+    # 绑定证书是顶层 cert 子命令（x-ui cert），写成 setting -webCert 会被静默忽略
+    "$bin" cert -webCert "${CERT_DIR}/${domain}/fullchain.pem" \
+                -webCertKey "${CERT_DIR}/${domain}/privkey.pem" >/dev/null 2>&1 || {
         echo -e "${RED}绑定面板证书失败${PLAIN}"; return 1; }
     detect_service
     systemctl restart "${SERVICE_NAME}" >/dev/null 2>&1

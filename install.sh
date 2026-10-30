@@ -153,6 +153,18 @@ auto_install() {
     cd /usr/local/x-ui || return 1
     chmod +x x-ui x-ui.sh
     [[ -f "bin/xray-linux-${arch}" ]] && chmod +x "bin/xray-linux-${arch}"
+
+    # geo 数据兜底：老版本安装包没有带 geoip/geosite，会导致 Xray 启动失败
+    # （日志：failed to load GeoIP: private ... open bin/geoip.dat: no such file）
+    if [[ ! -s bin/geoip.dat ]]; then
+        echo "  补装 geoip.dat / geosite.dat ..."
+        curl -fsSL --max-time 60 -o bin/geoip.dat \
+            https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat >/dev/null 2>&1 || true
+        curl -fsSL --max-time 60 -o bin/geosite.dat \
+            https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat >/dev/null 2>&1 || true
+        [[ -s bin/geoip.dat ]] && echo "  已补装 geoip.dat ($(stat -c%s bin/geoip.dat) 字节)" \
+            || echo -e "${yellow}  geo 数据下载失败，节点可能无法启动；可稍后 x-ui → 23 更新 Geo 文件${plain}"
+    fi
     cp -f x-ui.service /etc/systemd/system/x-ui.service
     systemctl daemon-reload
     systemctl enable x-ui >/dev/null 2>&1 || true
@@ -201,8 +213,10 @@ auto_install() {
                 --fullchain-file "/root/cert/${A_DOMAIN}/fullchain.pem" \
                 --reloadcmd "x-ui restart" >/dev/null 2>&1
             if [[ -f "/root/cert/${A_DOMAIN}/fullchain.pem" ]]; then
-                ./x-ui setting -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \
-                               -webCertKey "/root/cert/${A_DOMAIN}/privkey.pem" >/dev/null 2>&1
+                # 注意：绑定证书是顶层 cert 子命令（x-ui cert），写成 x-ui setting -webCert 会被静默忽略，
+                # 面板没有证书时会强制只监听 127.0.0.1，外部就打不开了
+                ./x-ui cert -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \
+                            -webCertKey "/root/cert/${A_DOMAIN}/privkey.pem" >/dev/null 2>&1
                 cert_done=1
                 echo "  证书已签发并绑定：/root/cert/${A_DOMAIN}/"
             fi
@@ -230,8 +244,8 @@ auto_install() {
                 chmod 600 "$self_dir/privkey.pem"
         fi
         if [ -s "$self_dir/fullchain.pem" ]; then
-            ./x-ui setting -webCert "$self_dir/fullchain.pem" \
-                           -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
+            ./x-ui cert -webCert "$self_dir/fullchain.pem" \
+                        -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
             cert_done=1
             self_signed=1
             echo "  已生成自签证书：$self_dir（有效期 10 年，CN=${self_ip}）"
@@ -278,6 +292,20 @@ auto_install() {
     sleep 6
     local active
     active=$(systemctl is-active x-ui)
+
+    # 关键校验：证书是否真的写进设置、面板是否对外监听
+    local bound_cert bound_listen
+    bound_cert=$(./x-ui setting -getCert true 2>/dev/null | grep -E "^cert:" | awk '{print $2}')
+    bound_listen=$(ss -tln 2>/dev/null | grep -E ":${A_PORT}[[:space:]]" | awk '{print $4}' | head -1)
+    if [[ -z "$bound_cert" ]]; then
+        echo -e "${red}  ⚠ 证书未绑定成功，面板将只监听 127.0.0.1（外部打不开）${plain}"
+        echo "     手动修复：cd /usr/local/x-ui && ./x-ui cert -webCert <证书> -webCertKey <私钥> && systemctl restart x-ui"
+    elif [[ "$bound_listen" == 127.0.0.1:* ]]; then
+        echo -e "${red}  ⚠ 面板只监听 ${bound_listen}，外部无法访问${plain}"
+        echo "     检查证书是否有效：./x-ui setting -getCert true"
+    else
+        echo "  自检通过：证书已绑定，面板监听 ${bound_listen:-$A_PORT}"
+    fi
 
     # Xray 在还没有任何入站时可能显示未运行，装完给个说明，避免误判为失败
     if ! pgrep -f "xray-linux" >/dev/null 2>&1; then
