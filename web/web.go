@@ -303,6 +303,10 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	controller.NewSubController(g)
 	// 【开源增强】订阅系统：多节点聚合订阅（管理需登录，/subg/:token 公开）
 	controller.NewSubGroupController(g)
+	// 【开源增强】面板证书：网页粘贴/上传（Cloudflare Origin / LE / 自签）
+	controller.NewCertController(g)
+	// 【开源增强】CDN 域名：面板内设置/修改/清除
+	controller.NewCdnController(g)
 	// 【开源增强】多面板：被控端 API（靠 slaveKey 鉴权）
 	controller.NewSlaveController(g)
 	// 【开源增强】多面板：主控端管理接口（需登录）

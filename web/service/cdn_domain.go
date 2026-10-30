@@ -41,6 +41,15 @@ func trailingDigits(s string) string {
 
 // FindCDNDomain 返回可用的 CDN 域名，找不到返回空字符串
 func FindCDNDomain(host string) string {
+	// 面板设置里显式指定的 CDN 域名优先
+	var settingService SettingService
+	if configured, err := settingService.GetCdnDomain(); err == nil {
+		configured = strings.TrimSpace(configured)
+		if configured != "" {
+			return configured
+		}
+	}
+
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return ""

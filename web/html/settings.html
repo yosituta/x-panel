@@ -260,6 +260,92 @@
                         :auto-size="{ minRows: 8, maxRows: 20 }" style="margin-top: 12px; font-family: monospace" />
                     </a-card>
                   </a-tab-pane>
+                  <a-tab-pane key="9" :style="{ paddingTop: '20px' }">
+                    <template #tab>
+                      <a-icon type="safety-certificate"></a-icon>
+                      <span>证书 / CDN</span>
+                    </template>
+
+                    <a-alert type="info" show-icon style="margin-bottom: 12px">
+                      <template #message>把证书粘进来即可，不需要 SSH，也不需要 Cloudflare API Key</template>
+                      <template #description>
+                        <div style="font-size: 12px; line-height: 1.7">
+                          Cloudflare：SSL/TLS → Origin Server → Create Certificate（有效期可选 15 年），
+                          把 Origin Certificate 与 Private Key 分别粘到下面两栏。<br>
+                          Let's Encrypt / 自签证书同理，粘贴 fullchain.pem 与 privkey.pem 的内容。
+                        </div>
+                      </template>
+                    </a-alert>
+
+                    <a-card size="small" style="margin-bottom: 12px" v-if="certInfo && certInfo.certFile">
+                      <a-descriptions :column="2" size="small" bordered>
+                        <a-descriptions-item label="当前域名"><span v-text="certInfo.domain || '-'"></span></a-descriptions-item>
+                        <a-descriptions-item label="颁发者"><span v-text="certInfo.issuer || '-'"></span></a-descriptions-item>
+                        <a-descriptions-item label="到期时间"><span v-text="certInfo.notAfter || '-'"></span></a-descriptions-item>
+                        <a-descriptions-item label="剩余天数">
+                          <a-tag :color="certInfo.days > 15 ? 'green' : 'orange'"><span v-text="certInfo.days"></span> 天</a-tag>
+                        </a-descriptions-item>
+                      </a-descriptions>
+                    </a-card>
+                    <a-alert v-else type="warning" show-icon style="margin-bottom: 12px"
+                             message="当前没有绑定证书：面板只会监听 127.0.0.1，外部无法访问" />
+
+                    <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 18 }" :colon="false">
+                      <a-form-item label="域名">
+                        <a-input v-model="certForm.domain" placeholder="panel.example.com（留空则从证书里自动识别）" />
+                      </a-form-item>
+                      <a-form-item label="证书">
+                        <a-textarea v-model="certForm.cert" :rows="7"
+                                    placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" />
+                      </a-form-item>
+                      <a-form-item label="私钥">
+                        <a-textarea v-model="certForm.key" :rows="7"
+                                    placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" />
+                      </a-form-item>
+                      <a-form-item :wrapper-col="{ span: 18, offset: 4 }">
+                        <a-space>
+                          <a-button type="primary" :loading="certSaving" @click="saveCert">保存并重启面板</a-button>
+                          <a-button @click="loadCert">刷新状态</a-button>
+                          <a-button danger @click="clearCert">清除证书</a-button>
+                        </a-space>
+                        <div style="margin-top: 8px; font-size: 12px; opacity: .65">
+                          保存后会自动重启面板，约 3 秒；重启后请用 https://域名:端口 访问。
+                        </div>
+                      </a-form-item>
+                    </a-form>
+
+                    <a-divider>CDN 域名</a-divider>
+                    <a-alert type="info" show-icon style="margin-bottom: 12px">
+                      <template #message>给 TLS 系节点套 Cloudflare 加速时填写（可选）</template>
+                      <template #description>
+                        <div style="font-size: 12px; line-height: 1.7">
+                          填了以后，一键配置生成节点时会自动用这个域名的 CDN 链接，端口自动选 CF 回源端口。<br>
+                          Cloudflare 里要把这条记录设为 <b>橙云（Proxied）</b>，SSL 模式选 Full。<br>
+                          Reality 系预设（1、2）无法套 CDN，只有第 3 项「VLESS Encryption + TLS」可以。
+                        </div>
+                      </template>
+                    </a-alert>
+
+                    <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 18 }" :colon="false">
+                      <a-form-item label="CDN 域名">
+                        <a-input v-model="cdnForm.domain" placeholder="cdn.example.com（留空=不启用，节点按直连生成）" />
+                      </a-form-item>
+                      <a-form-item :wrapper-col="{ span: 18, offset: 4 }">
+                        <a-space>
+                          <a-button type="primary" :loading="cdnSaving" @click="saveCdn">保存</a-button>
+                          <a-button @click="loadCdn">检测</a-button>
+                          <a-button danger @click="clearCdn">清除</a-button>
+                        </a-space>
+                        <div style="margin-top: 8px; font-size: 12px" v-if="cdnInfo && cdnInfo.domain">
+                          <a-tag v-if="cdnInfo.isCf" color="orange">Cloudflare 已启用</a-tag>
+                          <a-tag v-else-if="cdnInfo.resolved" color="red">已解析，但不是 Cloudflare</a-tag>
+                          <a-tag v-else color="red">域名解析失败</a-tag>
+                          <span style="margin-left: 8px; opacity: .7" v-text="(cdnInfo.ips || []).join(', ')"></span>
+                        </div>
+                      </a-form-item>
+                    </a-form>
+                  </a-tab-pane>
+
                 </a-tabs>
               </a-col>
             </a-row>
@@ -314,6 +400,14 @@
       ],
       // 【开源增强】定时报告
       report: { enable: false, interval: 'daily', time: '09:00', weekday: 1, day: 1, content: ['server', 'traffic', 'inbounds'] },
+      // 【开源增强】面板证书
+      certInfo: {},
+      certSaving: false,
+      certForm: { domain: '', cert: '', key: '' },
+      // 【开源增强】CDN 域名
+      cdnInfo: {},
+      cdnSaving: false,
+      cdnForm: { domain: '' },
       reportPreviewText: '',
       saveBtnDisable: true,
       user: {},
@@ -600,6 +694,76 @@
         } else {
           sendUpdateUserRequest();
         }
+      },
+      // 【开源增强】CDN 域名：查看 / 绑定 / 修改 / 清除
+      async loadCdn() {
+        const msg = await HttpUtil.post('/panel/api/cdn/status', {});
+        if (msg.success) {
+          this.cdnInfo = msg.obj || {};
+          this.cdnForm.domain = this.cdnInfo.domain || '';
+        }
+      },
+      async saveCdn() {
+        this.cdnSaving = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/cdn/save', { domain: (this.cdnForm.domain || '').trim() });
+          if (msg.success) {
+            this.cdnInfo = msg.obj || {};
+            this.$message.success('CDN 域名已保存');
+          } else {
+            this.$message.error(msg.msg || '保存失败');
+          }
+        } finally {
+          this.cdnSaving = false;
+        }
+      },
+      async clearCdn() {
+        const msg = await HttpUtil.post('/panel/api/cdn/clear', {});
+        if (msg.success) {
+          this.cdnInfo = {};
+          this.cdnForm.domain = '';
+          this.$message.success(msg.msg || '已清除');
+        } else {
+          this.$message.error(msg.msg || '清除失败');
+        }
+      },
+      // 【开源增强】面板证书：网页粘贴 / 上传
+      async loadCert() {
+        const msg = await HttpUtil.post('/panel/api/cert/status', {});
+        if (msg.success) {
+          this.certInfo = msg.obj || {};
+        }
+      },
+      async saveCert() {
+        if (!this.certForm.cert.trim() || !this.certForm.key.trim()) {
+          this.$message.error('证书和私钥都要填');
+          return;
+        }
+        this.certSaving = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/cert/save', {
+            domain: this.certForm.domain.trim(),
+            cert: this.certForm.cert,
+            key: this.certForm.key,
+          });
+          if (msg.success) {
+            this.certInfo = msg.obj || {};
+            this.certForm = { domain: '', cert: '', key: '' };
+            this.$message.success('证书已保存，面板将在 3 秒内重启');
+            setTimeout(() => window.location.reload(), 5000);
+          } else {
+            this.$message.error(msg.msg || '保存失败');
+          }
+        } finally {
+          this.certSaving = false;
+        }
+      },
+      async clearCert() {
+        const ok = await this.$confirm('清除后面板将只监听 127.0.0.1，外部无法访问，确定吗？', '清除证书');
+        if (!ok) return;
+        const msg = await HttpUtil.post('/panel/api/cert/clear', {});
+        this.$message[msg.success ? 'success' : 'error'](msg.msg || '已清除');
+        if (msg.success) setTimeout(() => window.location.reload(), 5000);
       },
       async restartPanel() {
         await new Promise(resolve => {

@@ -29,6 +29,7 @@ var defaultValueMap = map[string]string{
 	"webDomain":          "",
 	"webPort":            "13688",
 	"webCertFile":        "",
+	"cdnDomain":          "", // 【开源增强】CDN 域名（可在面板里设置/修改/清除）
 	"webKeyFile":         "",
 	"secret":             random.Seq(32),
 	"webBasePath":        "/",
@@ -378,6 +379,15 @@ func (s *SettingService) SetCertFile(webCertFile string) error {
 
 func (s *SettingService) GetCertFile() (string, error) {
 	return s.getString("webCertFile")
+}
+
+// GetCdnDomain CDN 域名（空表示不启用，节点按直连生成）
+func (s *SettingService) GetCdnDomain() (string, error) {
+	return s.getString("cdnDomain")
+}
+
+func (s *SettingService) SetCdnDomain(domain string) error {
+	return s.setString("cdnDomain", strings.TrimSpace(domain))
 }
 
 func (s *SettingService) SetKeyFile(webKeyFile string) error {
