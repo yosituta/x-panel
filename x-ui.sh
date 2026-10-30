@@ -241,22 +241,91 @@ uninstall() {
         fi
         return 0
     fi
-    systemctl stop "${SERVICE_NAME}"
-    systemctl disable "${SERVICE_NAME}"
-    rm /etc/systemd/system/x-ui.service -f
-    systemctl daemon-reload
-    systemctl reset-failed
-    rm /etc/x-ui/ -rf
-    rm /usr/local/x-ui/ -rf
+
+    detect_service >/dev/null 2>&1
+    local panel_port
+    panel_port=$(/usr/local/x-ui/x-ui setting -show true 2>/dev/null | grep -Eo 'port（端口号）: [0-9]+' | awk '{print $2}')
+    [ -z "$panel_port" ] && panel_port=$(/opt/x-panel/x-ui setting -show true 2>/dev/null | grep -Eo 'port（端口号）: [0-9]+' | awk '{print $2}')
 
     echo ""
-    echo -e "卸载成功\n"
-    echo "如果您需要再次安装此面板，可以使用以下命令:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/${X_PANEL_REPO}/master/install.sh)${plain}"
+    echo -e "${yellow}开始卸载...${plain}"
+
+    # 1. 停服务
+    systemctl stop "${SERVICE_NAME}" >/dev/null 2>&1
+    systemctl disable "${SERVICE_NAME}" >/dev/null 2>&1
+
+    # 2. 清理所有可能的单元文件
+    for u in x-ui x-panel 3x-ui; do
+        if [ -f "/etc/systemd/system/${u}.service" ]; then
+            rm -f "/etc/systemd/system/${u}.service"
+            rm -f "/etc/systemd/system/multi-user.target.wants/${u}.service"
+            echo "  已删除单元: ${u}.service"
+        fi
+    done
+    systemctl daemon-reload >/dev/null 2>&1
+    systemctl reset-failed >/dev/null 2>&1
+
+    # 3. 收掉残留进程
+    pkill -f "x-ui" >/dev/null 2>&1
+    pkill -f "xray-linux" >/dev/null 2>&1
+    sleep 1
+
+    # 4. 删除程序与数据
+    for d in /usr/local/x-ui /opt/x-panel /etc/x-ui; do
+        if [ -e "$d" ]; then
+            rm -rf "$d"
+            echo "  已删除目录: $d"
+        fi
+    done
+    for f in /usr/bin/x-ui /usr/local/bin/x-ui; do
+        [ -e "$f" ] && rm -f "$f" && echo "  已删除命令: $f"
+    done
+
+    # 5. 放行过的端口收回（只收面板端口，避免动到别的服务）
+    if [ -n "$panel_port" ] && command -v ufw >/dev/null 2>&1; then
+        ufw delete allow "${panel_port}"/tcp >/dev/null 2>&1 && echo "  已撤销防火墙规则: ${panel_port}/tcp"
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        [ -n "$panel_port" ] && firewall-cmd --remove-port="${panel_port}/tcp" --permanent >/dev/null 2>&1
+        firewall-cmd --reload >/dev/null 2>&1
+    fi
+
+    # 6. 校验
     echo ""
-    # Trap the SIGTERM signal
-    trap delete_script SIGTERM
-    delete_script
+    echo -e "${green}卸载结果校验${plain}"
+    local left=0
+    for chk in /etc/systemd/system/x-ui.service /etc/systemd/system/x-panel.service \
+               /usr/local/x-ui /opt/x-panel /etc/x-ui /usr/bin/x-ui; do
+        if [ -e "$chk" ]; then
+            echo -e "  ${red}仍存在${plain}: $chk"
+            left=$((left+1))
+        fi
+    done
+    if pgrep -f "x-ui|xray-linux" >/dev/null 2>&1; then
+        echo -e "  ${red}仍有进程${plain}: $(pgrep -af 'x-ui|xray-linux' | head -2)"
+        left=$((left+1))
+    fi
+
+    # 证书目录默认保留（里面可能有你其它服务的证书）
+    if [ -d /root/cert ] && [ -n "$(ls -A /root/cert 2>/dev/null)" ]; then
+        echo -e "  ${yellow}保留${plain}: /root/cert（证书，含 $(ls /root/cert | tr '\n' ' ')）"
+        echo "        确认不用了可手动删：rm -rf /root/cert"
+    fi
+
+    echo ""
+    if [ "$left" -eq 0 ]; then
+        echo -e "${green}卸载完成，已确认没有残留。${plain}"
+    else
+        echo -e "${yellow}卸载完成，但有 $left 项未清理，见上方标记。${plain}"
+    fi
+    echo ""
+    echo "如需重新安装："
+    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/${X_PANEL_REPO}/main/install.sh)${plain}"
+    echo ""
+
+    read -rp "按回车删除本菜单脚本并退出..." _
+    rm -f "$0" 2>/dev/null
+    exit 0
 }
 
 reset_user() {

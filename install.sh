@@ -175,6 +175,24 @@ auto_install() {
     if [[ "$use_cert" == "1" ]]; then
         echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
         /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
+
+        # standalone 需要独占 80：先停 nginx（宝塔/面板常占用），失败再给出明确指引
+        local nginx_stopped=0
+        port80_busy() { ss -tln 2>/dev/null | grep -qE ':80[[:space:]]'; }
+        if port80_busy; then
+            echo "  80 端口被占用，临时停止 nginx..."
+            systemctl stop nginx >/dev/null 2>&1 && nginx_stopped=1
+            sleep 2
+            if port80_busy; then
+                echo -e "${red}  80 端口仍被占用，跳过自动申请证书${plain}"
+                echo "    占用进程：$(ss -tlnp 2>/dev/null | grep -E ':80[[:space:]]' | grep -oE 'users:\(+\(\"?[^\"()]+' | head -1 | sed 's/.*("*//')"
+                echo "    处理办法（任选其一）："
+                echo "      1) 先停掉占用程序再重跑本脚本（宝塔：bt stop；或 systemctl stop nginx）"
+                echo "      2) 装完后面板里：x-ui → 18 → 1 重新申请"
+                echo "      3) 用 Cloudflare DNS 方式：x-ui → 19（不需要 80 端口）"
+                use_cert=0
+            fi
+        fi
         # --days 75：证书剩余 15 天时自动续期；acme.sh 自带 cron 任务
         if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 75 --force >/tmp/xp-acme.log 2>&1; then
             mkdir -p "/root/cert/${A_DOMAIN}"
@@ -190,8 +208,9 @@ auto_install() {
             fi
         else
             echo -e "${yellow}  证书申请失败，日志：/tmp/xp-acme.log${plain}"
-            echo -e "${yellow}  常见原因：域名未解析到本机 / 80 端口被占用或被墙${plain}"
+            echo -e "${yellow}  常见原因：域名未解析到本机 / 80 端口被占用或被墙 / Cloudflare 开了橙云${plain}"
             tail -6 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
+            echo -e "${yellow}  装完可以再试：x-ui → 18 → 1（或 19 用 CF DNS 方式）${plain}"
         fi
     else
         echo -e "${green}---- 6/6 未提供域名，生成自签证书（纯 IP 模式）----${plain}"
@@ -220,6 +239,11 @@ auto_install() {
         else
             echo -e "${yellow}  自签证书生成失败，面板将以 http 方式提供${plain}"
         fi
+    fi
+
+    # 恢复前面为申请证书临时停掉的 nginx
+    if [[ "${nginx_stopped:-0}" == "1" ]]; then
+        systemctl start nginx >/dev/null 2>&1 && echo "  已恢复 nginx 服务"
     fi
 
     # 防火墙
@@ -255,6 +279,12 @@ auto_install() {
     local active
     active=$(systemctl is-active x-ui)
 
+    # Xray 在还没有任何入站时可能显示未运行，装完给个说明，避免误判为失败
+    if ! pgrep -f "xray-linux" >/dev/null 2>&1; then
+        echo -e "${yellow}  说明：Xray 目前未运行。还没有创建任何入站节点时属正常，"
+        echo -e "        在面板里生成第一个节点后它会自动起来（也可 x-ui → 13 重启面板）。${plain}"
+    fi
+
     local scheme="http"
     [[ "$cert_done" == "1" ]] && scheme="https"
     local host="${A_DOMAIN:-$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)}"
@@ -267,7 +297,8 @@ auto_install() {
     echo "  面板版本 : $(./x-ui -v 2>/dev/null)"
     echo "  Xray 内核: $(./bin/xray-linux-${arch} version 2>/dev/null | head -1)"
     echo ""
-    echo -e "  登录地址 : ${yellow}${scheme}://${host}:${A_PORT}${A_PATH}/${plain}"
+    local url_path="${A_PATH%/}"
+    echo -e "  登录地址 : ${yellow}${scheme}://${host}:${A_PORT}${url_path}/${plain}"
     echo "  用户名   : ${A_USER}"
     echo "  密码     : ${A_PASS}"
     echo ""
@@ -283,7 +314,7 @@ auto_install() {
         echo -e "${yellow}未启用 HTTPS（面板暂时是 http）：${plain}"
         echo "  1) 域名 A 记录指到本机（建议灰云）"
         echo "  2) x-ui → 18 → 1 申请证书"
-        echo "  3) 完成后用 https://域名:${A_PORT}${A_PATH}/ 访问"
+        echo "  3) 完成后用 https://域名:${A_PORT}${A_PATH%/}/ 访问"
         echo ""
     fi
     echo -e "${yellow}下一步（多台服务器请按此命名规范）：${plain}"
