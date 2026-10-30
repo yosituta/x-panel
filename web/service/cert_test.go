@@ -58,7 +58,6 @@ func TestCertSaveRejectsWrongDomain(t *testing.T) {
 
 func TestCertSaveAcceptsValidPair(t *testing.T) {
 	certPEM, keyPEM := makeTestCert(t, "panel.example.com")
-	var s CertService
 
 	// 仅验证校验逻辑（真正落盘需要 root 与 /root/cert）
 	if err := verifyKeyMatch(mustParse(t, certPEM), []byte(keyPEM)); err != nil {

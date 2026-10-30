@@ -1,6 +1,9 @@
 package service
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
@@ -195,17 +198,24 @@ func verifyKeyMatch(cert *x509.Certificate, keyPEM []byte) error {
 		return fmt.Errorf("私钥解析失败：%v", err)
 	}
 
-	type pubKeyer interface{ Public() any }
-	pk, ok := key.(pubKeyer)
-	if !ok {
-		return errors.New("无法读取私钥公钥部分")
+	// 不同私钥类型的 Public() 签名不一致，这里显式分支处理
+	var pub any
+	switch k := key.(type) {
+	case *rsa.PrivateKey:
+		pub = &k.PublicKey
+	case *ecdsa.PrivateKey:
+		pub = &k.PublicKey
+	case ed25519.PrivateKey:
+		pub = k.Public()
+	default:
+		return errors.New("不支持的私钥类型")
 	}
 
 	certPub, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
 	if err != nil {
 		return err
 	}
-	keyPub, err := x509.MarshalPKIXPublicKey(pk.Public())
+	keyPub, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
 		return err
 	}
