@@ -184,75 +184,80 @@ auto_install() {
     fi
 
     local cert_done=0
+    local self_signed=0
+    local nginx_stopped=0
+    local self_dir="/root/cert/selfsigned"
+
+    # 自签证书兜底：没域名、或正式证书申请失败，都用它，
+    # 否则面板会因为没有证书而强制只监听 127.0.0.1，外网直接连不上。
+    make_self_signed() {
+        mkdir -p "$self_dir"
+        local ip
+        ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
+        [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        [ -z "$ip" ] && ip="127.0.0.1"
+        if [ ! -s "$self_dir/fullchain.pem" ]; then
+            openssl req -x509 -nodes -newkey rsa:2048 \
+                -keyout "$self_dir/privkey.pem" -out "$self_dir/fullchain.pem" \
+                -days 3650 -subj "/CN=${ip}" >/dev/null 2>&1 && \
+                chmod 600 "$self_dir/privkey.pem"
+        fi
+        [ -s "$self_dir/fullchain.pem" ] || return 1
+        ./x-ui cert -webCert "$self_dir/fullchain.pem" \
+                    -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
+        cert_done=1
+        self_signed=1
+        echo "  已启用自签证书：$self_dir（10 年，CN=${ip}）"
+        return 0
+    }
+
     if [[ "$use_cert" == "1" ]]; then
         echo -e "${green}---- 6/6 申请证书（acme.sh standalone，需 80 端口空闲）----${plain}"
         /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
 
-        # standalone 需要独占 80：先停 nginx（宝塔/面板常占用），失败再给出明确指引
-        local nginx_stopped=0
+        # standalone 需要独占 80：先停 nginx（宝塔/面板常占用）
         port80_busy() { ss -tln 2>/dev/null | grep -qE ':80[[:space:]]'; }
         if port80_busy; then
             echo "  80 端口被占用，临时停止 nginx..."
             systemctl stop nginx >/dev/null 2>&1 && nginx_stopped=1
             sleep 2
             if port80_busy; then
-                echo -e "${red}  80 端口仍被占用，跳过自动申请证书${plain}"
-                echo "    占用进程：$(ss -tlnp 2>/dev/null | grep -E ':80[[:space:]]' | grep -oE 'users:\(+\(\"?[^\"()]+' | head -1 | sed 's/.*("*//')"
-                echo "    处理办法（任选其一）："
-                echo "      1) 先停掉占用程序再重跑本脚本（宝塔：bt stop；或 systemctl stop nginx）"
-                echo "      2) 装完后面板里：x-ui → 18 → 1 重新申请"
-                echo "      3) 用 Cloudflare DNS 方式：x-ui → 19（不需要 80 端口）"
+                echo -e "${yellow}  80 端口仍被占用（宝塔等守护进程会自动拉起 nginx），跳过自动申请${plain}"
+                echo "    占用进程：$(ss -tlnp 2>/dev/null | grep -E ':80[[:space:]]' | grep -oE 'users:\(+\(\"?[^\"()]+' | head -1 | sed 's/.*("//')"
+                echo "    稍后申请正式证书（任选其一，都不用重装）："
+                echo "      1) 先停占用程序再重跑：宝塔执行 bt stop，或 systemctl stop nginx"
+                echo "      2) 面板里：x-ui → 18 → 1"
+                echo "      3) Cloudflare 域名走 DNS 方式：x-ui → 19（不需要 80 端口）"
                 use_cert=0
             fi
         fi
-        # --days 75：证书剩余 15 天时自动续期；acme.sh 自带 cron 任务
-        if /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 75 --force >/tmp/xp-acme.log 2>&1; then
+
+        # --days 75：90 天证书在剩余 15 天时续期
+        if [[ "$use_cert" == "1" ]] && /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 75 --force >/tmp/xp-acme.log 2>&1; then
             mkdir -p "/root/cert/${A_DOMAIN}"
             /root/.acme.sh/acme.sh --install-cert -d "$A_DOMAIN" --ecc \
                 --key-file "/root/cert/${A_DOMAIN}/privkey.pem" \
                 --fullchain-file "/root/cert/${A_DOMAIN}/fullchain.pem" \
                 --reloadcmd "x-ui restart" >/dev/null 2>&1
             if [[ -f "/root/cert/${A_DOMAIN}/fullchain.pem" ]]; then
-                # 注意：绑定证书是顶层 cert 子命令（x-ui cert），写成 x-ui setting -webCert 会被静默忽略，
-                # 面板没有证书时会强制只监听 127.0.0.1，外部就打不开了
+                # 绑定证书必须用顶层 cert 子命令；写成 setting -webCert 会被静默忽略
                 ./x-ui cert -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \
                             -webCertKey "/root/cert/${A_DOMAIN}/privkey.pem" >/dev/null 2>&1
                 cert_done=1
                 echo "  证书已签发并绑定：/root/cert/${A_DOMAIN}/"
             fi
-        else
+        elif [[ "$use_cert" == "1" ]]; then
             echo -e "${yellow}  证书申请失败，日志：/tmp/xp-acme.log${plain}"
             echo -e "${yellow}  常见原因：域名未解析到本机 / 80 端口被占用或被墙 / Cloudflare 开了橙云${plain}"
-            tail -6 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
-            echo -e "${yellow}  装完可以再试：x-ui → 18 → 1（或 19 用 CF DNS 方式）${plain}"
+            tail -4 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
         fi
-    else
-        echo -e "${green}---- 6/6 未提供域名，生成自签证书（纯 IP 模式）----${plain}"
-        # 自签证书：仍然是 HTTPS，浏览器会提示"不安全"，点继续即可；
-        # 好处是面板密码不会明文传输，且"http:// 自动跳 https"逻辑照样生效。
-        local self_signed=0
-        local self_dir="/root/cert/selfsigned"
-        mkdir -p "$self_dir"
-        local self_ip
-        self_ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
-        [ -z "$self_ip" ] && self_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
-        [ -z "$self_ip" ] && self_ip="127.0.0.1"
-        if [ ! -s "$self_dir/fullchain.pem" ]; then
-            openssl req -x509 -nodes -newkey rsa:2048 \
-                -keyout "$self_dir/privkey.pem" -out "$self_dir/fullchain.pem" \
-                -days 3650 -subj "/CN=${self_ip}" >/dev/null 2>&1 && \
-                chmod 600 "$self_dir/privkey.pem"
-        fi
-        if [ -s "$self_dir/fullchain.pem" ]; then
-            ./x-ui cert -webCert "$self_dir/fullchain.pem" \
-                        -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
-            cert_done=1
-            self_signed=1
-            echo "  已生成自签证书：$self_dir（有效期 10 年，CN=${self_ip}）"
-            echo "  以后申请正式证书：x-ui → 18 → 1，会自动替换，无需重装"
-        else
-            echo -e "${yellow}  自签证书生成失败，面板将以 http 方式提供${plain}"
-        fi
+    fi
+
+    # 正式证书没拿到（没域名 / 申请失败）→ 统一用自签证书兜底，
+    # 保证面板对外可访问（否则无证书时只会监听 127.0.0.1）
+    if [[ "$cert_done" != "1" ]]; then
+        echo -e "${green}---- 6/6 回退：生成自签证书（HTTPS 可用，浏览器提示继续）----${plain}"
+        make_self_signed || echo -e "${yellow}  自签证书生成失败，面板将以 http 方式提供${plain}"
     fi
 
     # 恢复前面为申请证书临时停掉的 nginx
@@ -331,12 +336,20 @@ auto_install() {
     echo "  密码     : ${A_PASS}"
     echo ""
     if [[ "${self_signed:-0}" == "1" ]]; then
-        echo -e "${yellow}当前使用自签证书（纯 IP 模式）：浏览器提示“不安全”时点“继续访问”即可${plain}"
-        echo -e "${yellow}订阅系统：x-ui → 25 → 1，会用自签证书运行在 https://IP:15268${plain}"
-        echo ""
-        echo -e "${yellow}以后换成正式证书（任选其一，都不用重装）：${plain}"
-        echo "  · 有域名      ：x-ui → 18 → 1   申请 Let's Encrypt（剩余 15 天自动续签）"
-        echo "  · 域名在 CF  ：x-ui → 18 → 8   用 Cloudflare 源站证书（15 年免续签）"
+        if [[ -n "$A_DOMAIN" ]]; then
+            echo -e "${yellow}证书：${A_DOMAIN} 的正式证书没申请成功，已自动改用自签证书${plain}"
+            echo -e "${yellow}      浏览器提示“不安全”点继续即可；面板已正常对外监听${plain}"
+            echo -e "${yellow}补申正式证书（任选其一，不用重装）：${plain}"
+            echo "  · 先停掉占用 80 的程序（宝塔：bt stop）后：x-ui → 18 → 1"
+            echo "  · 或用 Cloudflare DNS 方式：x-ui → 19（不需要 80 端口）"
+        else
+            echo -e "${yellow}当前使用自签证书（纯 IP 模式）：浏览器提示“不安全”时点“继续访问”即可${plain}"
+            echo -e "${yellow}订阅系统：x-ui → 25 → 1，会用自签证书运行在 https://IP:15268${plain}"
+            echo ""
+            echo -e "${yellow}以后换成正式证书（任选其一，都不用重装）：${plain}"
+            echo "  · 有域名      ：x-ui → 18 → 1   申请 Let's Encrypt（剩余 15 天自动续签）"
+            echo "  · 域名在 CF  ：x-ui → 18 → 8   用 Cloudflare 源站证书（15 年免续签）"
+        fi
         echo ""
     elif [[ "$cert_done" != "1" ]]; then
         echo -e "${yellow}未启用 HTTPS（面板暂时是 http）：${plain}"
