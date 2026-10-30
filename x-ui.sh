@@ -265,10 +265,14 @@ uninstall() {
     systemctl daemon-reload >/dev/null 2>&1
     systemctl reset-failed >/dev/null 2>&1
 
-    # 3. 收掉残留进程（只按精确路径/进程名匹配，避免误杀命令行里含 x-ui 的 shell 自身）
-    pkill -x x-ui >/dev/null 2>&1 || true
-    pkill -f "^/usr/local/x-ui/bin/xray-linux" >/dev/null 2>&1 || true
-    pkill -f "^/opt/x-panel/bin/xray-linux" >/dev/null 2>&1 || true
+    # 3. 收掉残留进程
+    #    注意：不能用 pkill -x x-ui / pkill -f x-ui —— 本脚本自身进程名就叫 x-ui，
+    #    会把正在执行卸载的 shell 一起杀掉，导致后面步骤全部不执行。
+    local self_pid=$$ parent_pid=$PPID
+    for pid in $(pgrep -f "^/usr/local/x-ui/bin/xray-linux" 2>/dev/null) \
+               $(pgrep -f "^/opt/x-panel/bin/xray-linux" 2>/dev/null); do
+        [ "$pid" = "$self_pid" ] || [ "$pid" = "$parent_pid" ] || kill "$pid" 2>/dev/null || true
+    done
     sleep 1
 
     # 4. 删除程序与数据
@@ -302,8 +306,17 @@ uninstall() {
             left=$((left+1))
         fi
     done
-    if pgrep -f "x-ui|xray-linux" >/dev/null 2>&1; then
-        echo -e "  ${red}仍有进程${plain}: $(pgrep -af 'x-ui|xray-linux' | head -2)"
+    # 只按绝对路径锚定匹配，避免把命令行里带 x-ui 字样的 shell 误判成残留
+    local leftover
+    leftover=$(pgrep -f "^/usr/local/x-ui/|^/opt/x-panel/" 2>/dev/null | grep -v -x -e "$$" -e "$PPID" || true)
+    if [ -n "$leftover" ]; then
+        echo -e "  ${yellow}清理残留进程${plain}: $(echo $leftover | tr '\n' ' ')"
+        for pid in $leftover; do kill "$pid" 2>/dev/null || true; done
+        sleep 1
+    fi
+    leftover=$(pgrep -f "^/usr/local/x-ui/|^/opt/x-panel/" 2>/dev/null || true)
+    if [ -n "$leftover" ]; then
+        echo -e "  ${red}仍有进程${plain}: $(echo $leftover | tr '\n' ' ')"
         left=$((left+1))
     fi
 
