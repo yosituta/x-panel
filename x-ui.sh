@@ -265,9 +265,10 @@ uninstall() {
     systemctl daemon-reload >/dev/null 2>&1
     systemctl reset-failed >/dev/null 2>&1
 
-    # 3. 收掉残留进程
-    pkill -f "x-ui" >/dev/null 2>&1
-    pkill -f "xray-linux" >/dev/null 2>&1
+    # 3. 收掉残留进程（只按精确路径/进程名匹配，避免误杀命令行里含 x-ui 的 shell 自身）
+    pkill -x x-ui >/dev/null 2>&1 || true
+    pkill -f "^/usr/local/x-ui/bin/xray-linux" >/dev/null 2>&1 || true
+    pkill -f "^/opt/x-panel/bin/xray-linux" >/dev/null 2>&1 || true
     sleep 1
 
     # 4. 删除程序与数据
