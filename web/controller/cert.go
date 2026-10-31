@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"time"
 
 	"x-ui/web/service"
 
@@ -56,11 +55,8 @@ func (a *CertController) save(c *gin.Context) {
 		jsonMsg(c, "保存证书失败", err)
 		return
 	}
-	// 延迟重启让响应先返回
-	go func() {
-		time.Sleep(2 * time.Second)
-		_ = a.panelService.RestartPanel(time.Second)
-	}()
+	// 不自动重启：保存只写配置（用户要求重启由自己点「重启面板」触发）。
+	// 之前这里 2 秒后自动重启，会和用户随后点的手动重启撞车，前端表现为 Network Error。
 	jsonObj(c, info, nil)
 }
 
@@ -69,9 +65,5 @@ func (a *CertController) clear(c *gin.Context) {
 		jsonMsg(c, "清除证书失败", err)
 		return
 	}
-	go func() {
-		time.Sleep(2 * time.Second)
-		_ = a.panelService.RestartPanel(time.Second)
-	}()
-	jsonMsg(c, "证书已清除，面板恢复为无证书模式（仅监听 127.0.0.1）", nil)
+	jsonMsg(c, "证书已清除。点「重启面板」后生效（当前连接仍用旧证书）", nil)
 }

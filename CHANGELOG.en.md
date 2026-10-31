@@ -13,6 +13,9 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 - **"Restart panel" no longer throws `Network Error`**: the restart drops the connection, so the request
   is bound to fail. The UI now shows "restarting…", polls `/panel/api/uiinfo` every 2 s and reloads the
   page automatically once the service is back (after 60 s it suggests a manual refresh or `x-ui → 14`).
+- **Saving a certificate no longer auto-restarts the panel**: the backend used to restart 2 s after save,
+  colliding with the user's own restart click and producing two `Network Error` toasts; saving now only
+  writes the configuration, and the restart happens solely via "Restart panel".
 - **Empty confirmation dialogs fixed**: `$confirm('content','title')` is not supported by
   ant-design-vue 1.x (the modal rendered with no text); switched to `$confirm({title, content})`
   for restart, remove-certificate and unbind-CDN.
