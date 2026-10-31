@@ -8,6 +8,19 @@
 
 ---
 
+## 证书页体验修复（v1.4.5，2026-11-01）
+
+- **「重启面板」不再弹 `Network Error`**：重启会中断当前连接，请求报错是必然的。
+  现在点完就显示「正在重启…」，随后每 2 秒探测 `/panel/api/uiinfo`，服务回来自动刷新页面；
+  超过 60 秒会提示手动刷新或 `x-ui → 14`。
+- **修复空白确认框**：`$confirm('内容','标题')` 这种两参数写法在 ant-design-vue 1.x 下不生效，
+  弹窗只有图标没有文字；改为 `$confirm({title, content})`（重启、移除证书、解绑 CDN 三处）。
+- **Cloudflare 源站证书给出明确提示**：识别到颁发者是 Cloudflare 时，状态卡会说明
+  「CF 源站证书只被 Cloudflare 代理信任，直接访问 `https://域名:54321` 浏览器仍提示不安全（不是没生效）」，
+  并指向 Let's Encrypt 方案。
+- **状态卡域名显示修正**：CF 源站证书的 CN 是 `CloudFlare Origin Certificate`，
+  以前被当成域名显示；现在 CN 不是合法域名（含空格或是 IP）时回落到 SAN，再回落到 `/root/cert/.panel_domain`。
+
 ## 更新时保留域名（v1.4.4，2026-10-31）
 
 - **`更新面板` 不带 `--domain` 时，沿用上次安装的域名**：域名记录在 `/root/cert/.panel_domain`。

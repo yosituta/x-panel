@@ -8,6 +8,21 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Certificate page UX (v1.4.5, 2026-11-01)
+
+- **"Restart panel" no longer throws `Network Error`**: the restart drops the connection, so the request
+  is bound to fail. The UI now shows "restarting…", polls `/panel/api/uiinfo` every 2 s and reloads the
+  page automatically once the service is back (after 60 s it suggests a manual refresh or `x-ui → 14`).
+- **Empty confirmation dialogs fixed**: `$confirm('content','title')` is not supported by
+  ant-design-vue 1.x (the modal rendered with no text); switched to `$confirm({title, content})`
+  for restart, remove-certificate and unbind-CDN.
+- **Cloudflare Origin certificates are explained**: when the issuer is Cloudflare the status card says the
+  certificate is only trusted behind Cloudflare's proxy, so hitting `https://domain:54321` directly still
+  shows "not secure" (which does not mean the upload failed), and points at Let's Encrypt instead.
+- **Status card domain fixed**: a CF Origin certificate's CN is `CloudFlare Origin Certificate`, which used
+  to be displayed as the domain; when CN is not a valid hostname (spaces, or an IP) it now falls back to
+  the SAN, then to `/root/cert/.panel_domain`.
+
 ## Domain preserved across updates (v1.4.4, 2026-10-31)
 
 - **`Update panel` without `--domain` reuses the previously installed domain**, stored in

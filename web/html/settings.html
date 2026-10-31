@@ -278,6 +278,12 @@
                               到期 <span v-text="certInfo.notAfter"></span> ·
                               剩余 <span v-text="certInfo.days"></span> 天
                             </span>
+                            <div v-if="certInfo.cfOrigin" style="margin-top: 8px; padding: 8px 10px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px; font-size: 12px; line-height: 1.7">
+                              <b>Cloudflare 源站证书只在 Cloudflare 代理后可信</b>：直接访问
+                              <code>https://<span v-text="certInfo.domain"></span>:54321</code> 浏览器仍会提示"不安全"（这不是没生效，
+                              是浏览器不认 Cloudflare Origin CA）。<br>
+                              想要绿锁：用 <b>Let's Encrypt</b> 证书（<code>x-ui → 18 → 1</code>，或在本页粘贴 LE 证书）。
+                            </div>
                           </template>
                           <template v-else>
                             <a-tag color="red">未绑定证书</a-tag>
@@ -378,7 +384,7 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v9</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v10</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
@@ -826,28 +832,47 @@
         }
       },
       async clearCert() {
-        const ok = await this.$confirm('移除后面板将只监听 127.0.0.1，外部无法访问，确定吗？', '移除证书');
+        const ok = await this.$confirm({ title: '移除证书', content: '移除后面板将只监听 127.0.0.1，外部无法访问，确定吗？' });
         if (!ok) return;
         const msg = await HttpUtil.post('/panel/api/cert/clear', {});
         this.$message[msg.success ? 'success' : 'error'](msg.msg || '已移除');
         if (msg.success) this.loadCert();
       },
       async restartPanelNow() {
-        const ok = await this.$confirm('重启期间面板会断开约 3 秒，确定现在重启吗？', '重启面板');
+        const ok = await this.$confirm({
+          title: '重启面板',
+          content: '重启期间面板会断开约 3 秒，页面会自动重连，确定现在重启吗？'
+        });
         if (!ok) return;
         this.panelRestarting = true;
+        this.$message.loading('正在重启面板…', 0);
         try {
-          const msg = await HttpUtil.post('/panel/api/setting/restartPanel', {});
-          if (msg.success) {
-            this.$message.success('已发出重启指令，3 秒后刷新页面即可');
-            setTimeout(() => window.location.reload(), 6000);
-          } else {
-            this.$message.error(msg.msg || '重启失败');
+          // 重启会让当前连接中断，请求报错是正常的（服务在重启中）
+          await HttpUtil.post('/panel/api/setting/restartPanel', {});
+        } catch (e) {
+          // 忽略：服务已经在下线
+        }
+        // 轮询公开探针，服务回来后自动刷新页面
+        let tries = 0;
+        const timer = setInterval(async () => {
+          tries++;
+          try {
+            const res = await fetch('/panel/api/uiinfo', { cache: 'no-store' });
+            if (res.ok) {
+              clearInterval(timer);
+              this.$message.destroy();
+              this.$message.success('面板已重启，正在刷新…');
+              setTimeout(() => window.location.reload(), 800);
+              return;
+            }
+          } catch (e) { /* 还没起来 */ }
+          if (tries > 30) {
+            clearInterval(timer);
+            this.$message.destroy();
+            this.$message.error('重启超时，请手动刷新页面或执行 x-ui → 14 检查状态');
             this.panelRestarting = false;
           }
-        } catch (e) {
-          this.panelRestarting = false;
-        }
+        }, 2000);
       },
       async loadCdn() {
         const msg = await HttpUtil.post('/panel/api/cdn/status', {});
@@ -882,7 +907,7 @@
         }
       },
       async unbindCdn() {
-        const ok = await this.$confirm('解绑会清空已保存的 CDN 域名，之后生成的节点按直连处理，确定吗？', '解绑 CDN 域名');
+        const ok = await this.$confirm({ title: '解绑 CDN 域名', content: '解绑会清空已保存的 CDN 域名，之后生成的节点按直连处理，确定吗？' });
         if (!ok) return;
         const msg = await HttpUtil.post('/panel/api/cdn/clear', {});
         if (msg.success) {

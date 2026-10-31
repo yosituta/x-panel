@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,10 @@ type CertInfo struct {
 	Issuer   string `json:"issuer"`
 	NotAfter string `json:"notAfter"`
 	Days     int    `json:"days"`
+	// CfOrigin 是否为 Cloudflare 源站证书（15 年）
+	// 这类证书只被 Cloudflare 代理信任：直接把面板暴露在 54321 上，
+	// 浏览器照样提示"不安全"，必须让用户知道原因。
+	CfOrigin bool `json:"cfOrigin"`
 }
 
 func (s *CertService) certDir(domain string) string {
@@ -60,13 +65,11 @@ func (s *CertService) Status() (*CertInfo, error) {
 	if err != nil {
 		return info, err
 	}
-	info.Domain = cert.Subject.CommonName
+	info.Domain = certDisplayDomain(cert)
 	info.Issuer = cert.Issuer.CommonName
 	info.NotAfter = cert.NotAfter.Format("2006-01-02")
 	info.Days = int(time.Until(cert.NotAfter).Hours() / 24)
-	if len(cert.DNSNames) > 0 && info.Domain == "" {
-		info.Domain = cert.DNSNames[0]
-	}
+	info.CfOrigin = isCfOriginCert(cert)
 	return info, nil
 }
 
@@ -227,3 +230,29 @@ func verifyKeyMatch(cert *x509.Certificate, keyPEM []byte) error {
 
 // 保证 model 包被引用（用于类型对齐，避免误删导入）
 var _ = model.Setting{}
+
+// certDisplayDomain 取一个"像域名"的名字用于展示
+// Cloudflare 源站证书的 CN 是 "CloudFlare Origin Certificate"（含空格、不是域名），
+// 直接用 CN 会把这个字符串当成域名显示，所以要回落到 SAN 里的第一个域名。
+func certDisplayDomain(cert *x509.Certificate) string {
+	cn := strings.TrimSpace(cert.Subject.CommonName)
+	if cn != "" && strings.Contains(cn, ".") && !strings.Contains(cn, " ") && net.ParseIP(cn) == nil {
+		return cn
+	}
+	if len(cert.DNSNames) > 0 {
+		return cert.DNSNames[0]
+	}
+	// 兜底：安装时记录的域名
+	if data, err := os.ReadFile("/root/cert/.panel_domain"); err == nil {
+		if d := strings.TrimSpace(string(data)); d != "" {
+			return d
+		}
+	}
+	return cn
+}
+
+// isCfOriginCert 判断是否为 Cloudflare Origin CA 签发的证书
+func isCfOriginCert(cert *x509.Certificate) bool {
+	hay := strings.ToLower(cert.Issuer.CommonName + " " + strings.Join(cert.Issuer.Organization, " "))
+	return strings.Contains(hay, "cloudflare")
+}
