@@ -8,6 +8,23 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Certificate page wrap-up (v1.4.6, 2026-11-01)
+
+- **Removed the "Restart panel" button next to "Save"** in the certificate card — the page header
+  already has one, and having two entry points invited misclicks. The header button now uses the same
+  auto-reconnect flow (polls `/panel/api/uiinfo` while restarting, reloads when the service is back).
+- **Saving never auto-restarts** (the backend's 2-second delayed restart is gone), which eliminates the
+  double `Network Error` toast.
+- **Status card now says whether browsers trust the certificate**:
+  - Cloudflare Origin certificate → explains it is only trusted behind Cloudflare's proxy, so hitting
+    `:54321` directly will always show "not secure"
+  - self-signed → "click through to continue; use a public CA certificate for a green lock"
+  - public CA (Let's Encrypt / ZeroSSL / DigiCert …) → no warning
+
+> Common misunderstanding: "saved + restarted" does not mean "green padlock".
+> Cloudflare's 15-year Origin CA certificate is only trusted by Cloudflare's edge, so with the panel
+> exposed directly on `:54321` every browser warns — that is the certificate type, not the panel.
+
 ## Certificate page UX (v1.4.5, 2026-11-01)
 
 - **"Restart panel" no longer throws `Network Error`**: the restart drops the connection, so the request

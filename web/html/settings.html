@@ -91,7 +91,7 @@
                     <a-col :xs="24" :sm="10" :style="{ padding: '4px' }">
                       <a-space direction="horizontal">
                         <a-button type="primary" :disabled="saveBtnDisable" @click="updateAllSetting">{{ i18n "pages.settings.save" }}</a-button>
-                        <a-button type="danger" :disabled="!saveBtnDisable" @click="restartPanel">{{ i18n "pages.settings.restartPanel" }}</a-button>
+                        <a-button type="danger" :disabled="!saveBtnDisable" @click="restartPanelNow">{{ i18n "pages.settings.restartPanel" }}</a-button>
                       </a-space>
                     </a-col>
                     <a-col :xs="24" :sm="14">
@@ -279,10 +279,15 @@
                               剩余 <span v-text="certInfo.days"></span> 天
                             </span>
                             <div v-if="certInfo.cfOrigin" style="margin-top: 8px; padding: 8px 10px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px; font-size: 12px; line-height: 1.7">
-                              <b>Cloudflare 源站证书只在 Cloudflare 代理后可信</b>：直接访问
-                              <code>https://<span v-text="certInfo.domain"></span>:54321</code> 浏览器仍会提示"不安全"（这不是没生效，
-                              是浏览器不认 Cloudflare Origin CA）。<br>
-                              想要绿锁：用 <b>Let's Encrypt</b> 证书（<code>x-ui → 18 → 1</code>，或在本页粘贴 LE 证书）。
+                              <b>这张是 Cloudflare 源站证书，浏览器不认（正常现象，不是没生效）</b><br>
+                              服务器确实已经用它在做 TLS，但 Cloudflare Origin CA 只有<b>经过 Cloudflare 代理</b>时才被信任。
+                              直接访问 <code>https://<span v-text="certInfo.domain"></span>:54321</code> 一定显示"不安全"。<br>
+                              要在 <code>:54321</code> 上看到绿锁：换成公共 CA 证书 —— <b>Let's Encrypt</b>
+                              （<code>x-ui → 18 → 1</code>，或在本页粘贴 LE 证书）。
+                            </div>
+                            <div v-else-if="certInfo.selfSigned" style="margin-top: 8px; padding: 8px 10px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 4px; font-size: 12px; line-height: 1.7">
+                              <b>这张是自签证书，浏览器会提示"不安全"</b>（点「继续访问」可用）。<br>
+                              想要绿锁：在本页粘贴公共 CA 证书，或 <code>x-ui → 18 → 1</code> 申请 Let's Encrypt。
                             </div>
                           </template>
                           <template v-else>
@@ -367,14 +372,11 @@
                             <a-button type="primary" :loading="certSaving" @click="saveCert">
                               <a-icon type="save"></a-icon> 保存
                             </a-button>
-                            <a-button :loading="panelRestarting" @click="restartPanelNow">
-                              <a-icon type="redo"></a-icon> 重启面板
-                            </a-button>
                             <a-button @click="resetCertForm">清空表单</a-button>
                             <a-button danger @click="clearCert">移除已绑定证书</a-button>
                           </a-space>
                           <div style="margin-top: 8px; font-size: 12px; opacity: .65">
-                            保存只写入配置，<b>重启面板后证书才生效</b>（服务启动时加载证书）。<br>
+                            保存只写入配置、<b>不会自动重启</b>；重启请用页面顶部的「重启面板」，重启后证书才生效。<br>
                             保存时会校验「私钥是否配对」「证书是否覆盖域名」，不通过不会写入。
                           </div>
                         </a-form-item>
@@ -384,7 +386,7 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v11</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v12</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
@@ -916,31 +918,6 @@
           this.$message.success('已解绑 CDN 域名');
         } else {
           this.$message.error(msg.msg || '解绑失败');
-        }
-      },
-      async restartPanel() {
-        await new Promise(resolve => {
-          this.$confirm({
-            title: '{{ i18n "pages.settings.restartPanel" }}',
-            content: '{{ i18n "pages.settings.restartPanelDesc" }}',
-            class: themeSwitcher.currentTheme,
-            okText: '{{ i18n "sure" }}',
-            cancelText: '{{ i18n "cancel" }}',
-            onOk: () => resolve(),
-          });
-        });
-        this.loading(true);
-        const msg = await HttpUtil.post("/panel/setting/restartPanel");
-        this.loading(false);
-        if (msg.success) {
-          this.loading(true);
-          await PromiseUtil.sleep(5000);
-          var { webCertFile, webKeyFile, webDomain: host, webPort: port, webBasePath: base } = this.allSetting;
-          if (host == this.oldAllSetting.webDomain) host = null;
-          if (port == this.oldAllSetting.webPort) port = null;
-          const isTLS = webCertFile !== "" || webKeyFile !== "";
-          const url = URLBuilder.buildURL({ host, port, isTLS, base, path: "panel/settings" });
-          window.location.replace(url);
         }
       },
       toggleTwoFactor(newValue) {

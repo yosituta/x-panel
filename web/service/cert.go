@@ -38,6 +38,10 @@ type CertInfo struct {
 	// 这类证书只被 Cloudflare 代理信任：直接把面板暴露在 54321 上，
 	// 浏览器照样提示"不安全"，必须让用户知道原因。
 	CfOrigin bool `json:"cfOrigin"`
+	// SelfSigned 自签证书（颁发者与主体相同）
+	SelfSigned bool `json:"selfSigned"`
+	// Trusted 是否为公共 CA 签发（浏览器默认可信）
+	Trusted bool `json:"trusted"`
 }
 
 func (s *CertService) certDir(domain string) string {
@@ -70,6 +74,8 @@ func (s *CertService) Status() (*CertInfo, error) {
 	info.NotAfter = cert.NotAfter.Format("2006-01-02")
 	info.Days = int(time.Until(cert.NotAfter).Hours() / 24)
 	info.CfOrigin = isCfOriginCert(cert)
+	info.SelfSigned = cert.Issuer.String() == cert.Subject.String()
+	info.Trusted = !info.CfOrigin && !info.SelfSigned && isPublicCA(cert)
 	return info, nil
 }
 
@@ -255,4 +261,17 @@ func certDisplayDomain(cert *x509.Certificate) string {
 func isCfOriginCert(cert *x509.Certificate) bool {
 	hay := strings.ToLower(cert.Issuer.CommonName + " " + strings.Join(cert.Issuer.Organization, " "))
 	return strings.Contains(hay, "cloudflare")
+}
+// isPublicCA 粗判是否为公共可信 CA（浏览器默认信任的那些）
+// 只用于界面提示，不影响任何证书功能。
+func isPublicCA(cert *x509.Certificate) bool {
+	hay := strings.ToLower(cert.Issuer.CommonName + " " + strings.Join(cert.Issuer.Organization, " "))
+	for _, k := range []string{"let's encrypt", "zerossl", "buypass", "digicert", "sectigo",
+		"globalsign", "google trust", "amazon", "geotrust", "comodo", "thawte", "rapidssl",
+		"trustasia", "ssl.com", "certum", "entrust"} {
+		if strings.Contains(hay, k) {
+			return true
+		}
+	}
+	return false
 }
