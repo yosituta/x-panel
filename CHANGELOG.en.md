@@ -8,6 +8,21 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Certificate access URL (v1.4.3, 2026-10-31)
+
+- **Login URL no longer shows "selfsigned"**: `x-ui → 10 Show panel settings` used the certificate's
+  directory name as the host, so the self-signed fallback directory `/root/cert/selfsigned` produced
+  `https://selfsigned:54321/`, which cannot resolve. The host is now parsed from the certificate's
+  SAN/CN, falling back to the server's public IP when it is an IP or missing.
+- **Self-signed certificates are called out explicitly**, and the script scans for existing real
+  certificates on the machine (`/root/cert/*`, `/etc/letsencrypt/live/*`) and prints the exact
+  re-bind command instead of asking you to re-issue.
+- **`18 → 6 Show existing domains`** now prints the real domain from the certificate and marks
+  self-signed ones as "emergency access only".
+- **Updating/ reinstalling no longer overwrites a bound certificate**: previously running the installer
+  without `--domain` replaced a real certificate with the self-signed fallback; now an existing
+  non-self-signed binding is kept as-is.
+
 ## In-panel certificate / CDN page (v1.4.2, 2026-10-31)
 
 ### Added

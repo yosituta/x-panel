@@ -401,6 +401,35 @@ reset_config() {
     confirm_restart
 }
 
+# 【开源增强】从证书里解析真实访问主机名
+# 之前是拿证书所在目录名当域名（/root/cert/selfsigned → "selfsigned"），
+# 自签兜底时会把登录地址显示成 https://selfsigned:54321/，完全没法用。
+# 现在优先取证书 SAN/CN 里的域名；解析不到或是 IP 就回落到服务器公网 IP。
+panel_cert_host() {
+    local cert="$1" host="" ip=""
+    if [[ -s "$cert" ]]; then
+        host=$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
+               | grep -oE 'DNS:[^,]+' | head -1 | sed 's/DNS://')
+        [[ -z "$host" ]] && host=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null \
+               | sed -n 's/.*CN *= *//p' | head -1)
+    fi
+    if [[ -z "$host" || "$host" == "selfsigned" || "$host" =~ ^[0-9.]+$ || "$host" =~ : ]]; then
+        ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
+        [[ -z "$ip" ]] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        [[ -n "$ip" ]] && host="$ip"
+    fi
+    echo "$host"
+}
+
+# 是否自签证书（issuer == subject 说明是自签）
+panel_cert_is_selfsigned() {
+    local cert="$1" iss sub
+    [[ -s "$cert" ]] || return 1
+    iss=$(openssl x509 -in "$cert" -noout -issuer 2>/dev/null | sed 's/issuer=//')
+    sub=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null | sed 's/subject=//')
+    [[ -n "$iss" && "$iss" == "$sub" ]]
+}
+
 check_config() {
     info=$(/usr/local/x-ui/x-ui setting -show true)
     if [[ $? != 0 ]]; then
@@ -422,8 +451,30 @@ check_config() {
         echo -e "${green}面板已安装证书采用SSL保护${plain}"
         echo ""
         local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-        domain=$(basename "$(dirname "$existing_cert")")
+        domain=$(panel_cert_host "$existing_cert")
+        [[ -z "$domain" ]] && domain=$(basename "$(dirname "$existing_cert")")
         echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${green}${existing_webBasePath}${plain}"
+        if panel_cert_is_selfsigned "$existing_cert"; then
+            echo -e "${yellow}（当前是自签证书，浏览器会提示不安全，点「继续访问」即可）${plain}"
+            # 机器上可能还留着正式证书：找出来直接给命令，省得重新申请
+            local found_cert found_host
+            for f in /root/cert/*/fullchain.pem /etc/letsencrypt/live/*/fullchain.pem; do
+                [[ -s "$f" ]] || continue
+                panel_cert_is_selfsigned "$f" && continue
+                found_cert="$f"
+                found_host=$(panel_cert_host "$f")
+                break
+            done
+            if [[ -n "$found_cert" ]]; then
+                echo -e "${green}  检测到现成的正式证书：${found_host:-未知域名}${plain}"
+                echo    "    $found_cert"
+                echo    "    重新绑定：x-ui → 18 → 7（填上面的证书和同目录 privkey.pem）"
+                echo    "    或直接执行："
+                echo -e "${green}    /usr/local/x-ui/x-ui cert -webCert \"$found_cert\" -webCertKey \"$(dirname "$found_cert")/privkey.pem\" && systemctl restart x-ui${plain}"
+            else
+                echo -e "${yellow}  想用正式域名访问：x-ui → 18 → 1 申请 Let's Encrypt 证书${plain}"
+            fi
+        fi
     fi
     echo ""
     if [[ -z "$existing_cert" && -z "$existing_key" ]]; then
@@ -1327,8 +1378,14 @@ ssl_cert_issue_main() {
             for domain in $domains; do 
                 local cert_path="/root/cert/${domain}/fullchain.pem" 
                 local key_path="/root/cert/${domain}/privkey.pem" 
-                if [[ -f "${cert_path}" && -f "${key_path}" ]]; then 
-                    echo -e "域名：${domain}"
+                if [[ -f "${cert_path}" && -f "${key_path}" ]]; then
+                    local real_host
+                    real_host=$(panel_cert_host "${cert_path}")
+                    if panel_cert_is_selfsigned "${cert_path}"; then
+                        echo -e "域名：${real_host} ${yellow}（自签证书，仅用于应急访问）${plain}"
+                    else
+                        echo -e "域名：${real_host:-$domain}"
+                    fi
                     echo "" 
                     echo -e "\t证书路径：${cert_path}"
                     echo "" 

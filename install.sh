@@ -255,6 +255,28 @@ auto_install() {
 
     # 正式证书没拿到（没域名 / 申请失败）→ 统一用自签证书兜底，
     # 保证面板对外可访问（否则无证书时只会监听 127.0.0.1）
+    # 【重要】更新面板 / 重装时不要动已有证书：
+    # 之前的行为是「没带 --domain 就用自签兜底」，会把已经绑好的正式证书换成自签，
+    # 面板访问地址也跟着变成 https://selfsigned:54321/。
+    # 现在只要已绑定的证书文件存在、且不是自签兜底目录，就直接保留。
+    if [[ "$cert_done" != "1" ]]; then
+        local keep_cert keep_key keep_host keep_issuer
+        keep_cert=$(./x-ui setting -getCert true 2>/dev/null | grep -E "^cert:" | awk '{print $2}')
+        keep_key=$(./x-ui setting -getCert true 2>/dev/null | grep -E "^key:" | awk '{print $2}')
+        if [[ -s "$keep_cert" && -s "$keep_key" && ! "$keep_cert" =~ /selfsigned/ ]]; then
+            cert_done=1
+            keep_host=$(openssl x509 -in "$keep_cert" -noout -ext subjectAltName 2>/dev/null \
+                        | grep -oE 'DNS:[^,]+' | head -1 | sed 's/DNS://')
+            [[ -z "$keep_host" ]] && keep_host=$(openssl x509 -in "$keep_cert" -noout -subject 2>/dev/null \
+                        | sed -n 's/.*CN *= *//p' | head -1)
+            keep_issuer=$(openssl x509 -in "$keep_cert" -noout -issuer 2>/dev/null | sed -n 's/issuer=//p')
+            echo -e "${green}---- 6/6 检测到已绑定证书，保留不覆盖 ----${plain}"
+            echo "  证书: $keep_cert"
+            [[ -n "$keep_issuer" ]] && echo "  颁发者: $keep_issuer"
+            [[ -n "$keep_host" ]] && echo "  访问地址: https://${keep_host}:${A_PORT}${A_PATH}"
+        fi
+    fi
+
     if [[ "$cert_done" != "1" ]]; then
         echo -e "${green}---- 6/6 回退：生成自签证书（HTTPS 可用，浏览器提示继续）----${plain}"
         make_self_signed || echo -e "${yellow}  自签证书生成失败，面板将以 http 方式提供${plain}"
