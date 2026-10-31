@@ -240,6 +240,11 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		uri := c.Request.RequestURI
 		if strings.HasPrefix(uri, assetsBasePath) {
 			c.Header("Cache-Control", "max-age=31536000")
+		} else {
+			// 页面本身不缓存：升级后浏览器必须拿到新模板，否则会一直显示旧界面
+			c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
 		}
 	})
 	// 【开源增强】HTTPS 页面下发 HSTS：域名访问时，浏览器以后即使输入 http:// 也会自己升级到 https://
