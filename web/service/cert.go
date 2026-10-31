@@ -119,6 +119,12 @@ func (s *CertService) Save(domain, certPEM, keyPEM string) (*CertInfo, error) {
 		return nil, errors.New("无法从证书中识别域名，请手动填写域名")
 	}
 
+	// 记住用户实际访问用的域名（通配证书不覆盖已有记录）
+	if !strings.HasPrefix(domain, "*.") {
+		_ = os.MkdirAll("/root/cert", 0o755)
+		_ = os.WriteFile("/root/cert/.panel_domain", []byte(domain+"\n"), 0o644)
+	}
+
 	dir := s.certDir(domain)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("创建目录失败：%v", err)

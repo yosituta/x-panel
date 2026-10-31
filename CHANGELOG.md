@@ -8,6 +8,26 @@
 
 ---
 
+## 访问域名解析修正（v1.4.7，2026-11-01）
+
+- **修掉「显示 bbua.pp.ua:54321」**：证书保存时通配证书 `*.bbua.pp.ua` 的目录会被规范成
+  `/root/cert/bbua.pp.ua`，而 `install.sh` 的安装收尾仍用「证书目录名」当域名，于是打印成
+  `https://bbua.pp.ua:54321/`（少了 `hk.`）。
+  现在统一按优先级取：**证书里的具体域名 → `/root/cert/.panel_domain` → 通配名 → 目录名 → 公网 IP**，
+  `x-ui.sh`（查看设置 / 18→6）与 `install.sh`（安装与更新收尾）用同一套规则。
+- **面板绑定证书时记录域名**：在面板里保存证书时，若填的是具体域名（非通配），写入
+  `/root/cert/.panel_domain`，后续安装/更新据此显示访问地址。
+- **去掉 `wg-quick: command not found` 噪音**：WARP 是可选组件，没装时安装脚本不再调用
+  `wg-quick`（顺带修正一处 `2A>&1` 的笔误）。
+
+实测（真实服务器，三种证书 × 有无记录）：
+
+```
+无 .panel_domain：通配 → *.bbua.pp.ua   具体 → hk.bbua.pp.ua   自签CN=IP → 公网IP
+有 .panel_domain=hk.bbua.pp.ua：三种情况全部 → hk.bbua.pp.ua
+install.sh 的 panel_bound_host 结果与 x-ui.sh 完全一致
+```
+
 ## 证书页收尾（v1.4.6，2026-11-01）
 
 - **删掉证书区「保存」旁的「重启面板」按钮**：页面顶部已有同一个按钮，两个入口容易误点。

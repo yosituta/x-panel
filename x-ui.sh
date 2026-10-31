@@ -406,24 +406,32 @@ reset_config() {
 # 自签兜底时会把登录地址显示成 https://selfsigned:54321/，完全没法用。
 # 现在优先取证书 SAN/CN 里的域名；解析不到或是 IP 就回落到服务器公网 IP。
 panel_cert_host() {
-    local cert="$1" host="" ip=""
+    local cert="$1" cn="" dns="" host="" saved="" ip="" h
     if [[ -s "$cert" ]]; then
-        host=$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
-               | grep -oE 'DNS:[^,]+' | head -1 | sed 's/DNS://')
-        [[ -z "$host" ]] && host=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null \
-               | sed -n 's/.*CN *= *//p' | head -1)
+        cn=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null \
+             | sed -n 's/.*CN *= *//p' | head -1 | tr -d '[:space:]')
+        dns=$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
+              | grep -oE 'DNS:[^,]+' | sed 's/DNS://' | tr -d '[:space:]')
     fi
-    if [[ -z "$host" || "$host" == "selfsigned" || "$host" =~ ^[0-9.]+$ || "$host" =~ : ]]; then
-        # 自签兜底：优先用安装时记下的域名（/root/cert/.panel_domain），
-        # 这样即使证书是自签的，登录地址也显示你自己的域名而不是 IP
-        if [[ -s /root/cert/.panel_domain ]]; then
-            local saved
-            saved=$(head -1 /root/cert/.panel_domain 2>/dev/null | tr -d '[:space:]')
-            if [[ -n "$saved" ]]; then echo "$saved"; return; fi
-        fi
+    # 1) 证书里"具体的"域名（跳过通配和 IP）——最可信
+    for h in $cn $dns; do
+        [[ "$h" == \*.* || "$h" =~ ^[0-9.]+$ || "$h" != *.* ]] && continue
+        host="$h"; break
+    done
+    # 2) 安装/绑定时记录的域名（/root/cert/.panel_domain）
+    if [[ -z "$host" && -s /root/cert/.panel_domain ]]; then
+        saved=$(head -1 /root/cert/.panel_domain 2>/dev/null | tr -d '[:space:]')
+        [[ -n "$saved" ]] && host="$saved"
+    fi
+    # 3) 只有通配证书：显示通配名（*.example.com）
+    if [[ -z "$host" ]]; then
+        for h in $cn $dns; do [[ "$h" == \*.* ]] && { host="$h"; break; }; done
+    fi
+    # 4) 兜底：服务器公网 IP
+    if [[ -z "$host" ]]; then
         ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
         [[ -z "$ip" ]] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
-        [[ -n "$ip" ]] && host="$ip"
+        host="${ip:-127.0.0.1}"
     fi
     echo "$host"
 }

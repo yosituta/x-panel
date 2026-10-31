@@ -367,7 +367,13 @@ auto_install() {
 
     local scheme="http"
     [[ "$cert_done" == "1" ]] && scheme="https"
-    local host="${A_DOMAIN:-$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)}"
+    local host="${A_DOMAIN}"
+    if [[ -z "$host" ]]; then
+        local bound_cert_for_host
+        bound_cert_for_host=$(./x-ui setting -getCert true 2>/dev/null | grep -E "^cert:" | awk '{print $2}')
+        [[ -n "$bound_cert_for_host" ]] && host=$(panel_bound_host "$bound_cert_for_host")
+    fi
+    [[ -z "$host" ]] && host=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
 
     echo ""
     echo -e "${green}========================================${plain}"
@@ -817,6 +823,34 @@ install_free_version() {
         config_after_install
         xp_open_firewall
 
+# 从已绑定的证书推算"该用哪个域名访问"：具体域名 > .panel_domain > 通配 > 目录名 > 公网 IP
+panel_bound_host() {
+    local cert="$1" cn="" dns="" host="" saved="" ip="" h
+    if [[ -s "$cert" ]]; then
+        cn=$(openssl x509 -in "$cert" -noout -subject 2>/dev/null \
+             | sed -n 's/.*CN *= *//p' | head -1 | tr -d '[:space:]')
+        dns=$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null \
+              | grep -oE 'DNS:[^,]+' | sed 's/DNS://' | tr -d '[:space:]')
+    fi
+    for h in $cn $dns; do
+        [[ "$h" == \*.* || "$h" =~ ^[0-9.]+$ || "$h" != *.* ]] && continue
+        host="$h"; break
+    done
+    if [[ -z "$host" && -s /root/cert/.panel_domain ]]; then
+        saved=$(head -1 /root/cert/.panel_domain 2>/dev/null | tr -d '[:space:]')
+        [[ -n "$saved" ]] && host="$saved"
+    fi
+    if [[ -z "$host" ]]; then
+        for h in $cn $dns; do [[ "$h" == \*.* ]] && { host="$h"; break; }; done
+    fi
+    if [[ -z "$host" ]]; then
+        ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
+        [[ -z "$ip" ]] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+        host="${ip:-127.0.0.1}"
+    fi
+    echo "$host"
+}
+
     ssh_forwarding() {
         # 获取 IPv4 和 IPv6 地址
         v4=$(curl -s4m8 http://ip.sb -k)
@@ -830,7 +864,8 @@ install_free_version() {
             echo -e "${green}面板已安装证书采用SSL保护${plain}"
             echo ""
             local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
-            domain=$(basename "$(dirname "$existing_cert")")
+            # 不再用证书所在目录名（通配证书会被存成 bbua.pp.ua，显示出来就是错的）
+            domain=$(panel_bound_host "$existing_cert")
             echo -e "${green}登录访问面板URL: https://${domain}:${existing_port}${green}${existing_webBasePath}${plain}"
         fi
         echo ""
@@ -882,12 +917,18 @@ install_free_version() {
         systemctl daemon-reload
         systemctl enable x-ui
         systemctl start x-ui
-        systemctl stop warp-go >/dev/null 2>&1
-        wg-quick down wgcf >/dev/null 2>&1
+        # WARP（warp-go / wgcf）是可选组件：没装就完全跳过，
+        # 否则会打印 "wg-quick: command not found" 这种吓人的噪音
+        systemctl stop warp-go >/dev/null 2>&1 || true
+        if command -v wg-quick >/dev/null 2>&1; then
+            wg-quick down wgcf >/dev/null 2>&1 || true
+        fi
         ipv4=$(curl -s4m8 ip.p3terx.com -k | sed -n 1p)
         ipv6=$(curl -s6m8 ip.p3terx.com -k | sed -n 1p)
-        systemctl start warp-go >/dev/null 2>&1
-        wg-quick up wgcf >/dev/null 2A>&1
+        systemctl start warp-go >/dev/null 2>&1 || true
+        if command -v wg-quick >/dev/null 2>&1; then
+            wg-quick up wgcf >/dev/null 2>&1 || true
+        fi
 
         echo ""
         echo -e "------->>>>${green}X-Panel 免费基础版 ${last_version}${plain}<<<<安装成功，正在启动..."

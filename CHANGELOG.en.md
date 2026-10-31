@@ -8,6 +8,26 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Access-host resolution fixed (v1.4.7, 2026-11-01)
+
+- **"bbua.pp.ua:54321" display fixed**: saving a wildcard certificate (`*.bbua.pp.ua`) normalises the
+  directory to `/root/cert/bbua.pp.ua`, and the installer's closing summary still used that directory
+  name as the host — printing `https://bbua.pp.ua:54321/` (missing `hk.`). Both `install.sh` and
+  `x-ui.sh` now resolve in one order: **concrete host in the certificate → `/root/cert/.panel_domain`
+  → wildcard name → directory name → public IP**.
+- **Binding a certificate records the domain**: when a concrete (non-wildcard) host is entered in the
+  panel, it is written to `/root/cert/.panel_domain` so later installs/updates show the right address.
+- **`wg-quick: command not found` noise removed**: WARP is optional, so the installer no longer calls
+  `wg-quick` when it is absent (also fixed a `2A>&1` typo).
+
+Verified on a live server across three certificate types with and without the record:
+
+```
+no .panel_domain: wildcard → *.bbua.pp.ua   concrete → hk.bbua.pp.ua   self-signed CN=IP → public IP
+with .panel_domain=hk.bbua.pp.ua: all three → hk.bbua.pp.ua
+install.sh's panel_bound_host matches x-ui.sh exactly
+```
+
 ## Certificate page wrap-up (v1.4.6, 2026-11-01)
 
 - **Removed the "Restart panel" button next to "Save"** in the certificate card — the page header
