@@ -378,13 +378,15 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v8</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v9</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
                         <a-form-item label="域名">
-                          <a-input v-model="cdnForm.domain" style="max-width: 420px"
-                                   placeholder="cdn.example.com" @pressEnter="bindCdn"></a-input>
+                          <div @keyup.enter="bindCdn">
+                            <a-input v-model="cdnForm.domain" style="max-width: 420px"
+                                     placeholder="cdn.example.com"></a-input>
+                          </div>
                           <div style="margin-top: 10px">
                             <!-- 用原生 button：不依赖 antd 组件注册，确保任何情况下都能显示 -->
                             <button type="button" class="ant-btn ant-btn-primary" :disabled="cdnSaving" @click="bindCdn">

@@ -1,0 +1,58 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="web/assets/ant-design-vue/antd.min.css">
+</head><body style="padding:20px">
+<div id="app">
+<a-form :label-col="{span:4}" :wrapper-col="{span:20}">
+<a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
+                      <template #extra>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v8</span>
+                      </template>
+
+                      <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
+                        <a-form-item label="域名">
+                          <a-input v-model="cdnForm.domain" style="max-width: 420px"
+                                   placeholder="cdn.example.com" @pressEnter="bindCdn"></a-input>
+                          <div style="margin-top: 10px">
+                            <!-- 用原生 button：不依赖 antd 组件注册，确保任何情况下都能显示 -->
+                            <button type="button" class="ant-btn ant-btn-primary" :disabled="cdnSaving" @click="bindCdn">
+                              <span v-if="cdnSaving">保存中…</span><span v-else>绑定</span>
+                            </button>
+                            <button type="button" class="ant-btn" style="margin-left: 8px" @click="unbindCdn">解绑</button>
+                            <span style="margin-left: 12px; font-size: 12px; opacity: .55">CDN 保存后立即生效，无需重启</span>
+                          </div>
+
+                          <div style="margin-top: 10px; font-size: 12px" v-if="cdnInfo && cdnInfo.domain">
+                            <a-tag v-if="cdnInfo.isCf" color="orange">已绑定 · Cloudflare 生效</a-tag>
+                            <a-tag v-else-if="cdnInfo.resolved" color="red">已绑定 · 但没走 Cloudflare</a-tag>
+                            <a-tag v-else color="red">已绑定 · 域名解析失败</a-tag>
+                            <span style="margin-left: 8px; opacity: .7" v-text="(cdnInfo.ips || []).join(', ')"></span>
+                          </div>
+                          <div style="margin-top: 10px; font-size: 12px; opacity: .65" v-else>
+                            当前未绑定 CDN 域名，生成的节点按直连处理
+                          </div>
+                        </a-form-item>
+                      </a-form>
+
+                      <a-alert type="info" show-icon>
+                        <template #message>怎么用</template>
+                        <template #description>
+                          <div style="font-size: 12px; line-height: 1.8">
+                            1. Cloudflare 里加 A 记录：名称 <code>cdn</code>，内容填服务器 IP，<b>开橙云（Proxied）</b>，SSL 模式选 Full<br>
+                            2. 这里填 <code>cdn.你的域名</code>，点「绑定」<br>
+                            3. 面板【一键配置】选第 3 项生成节点，结果里会多一条带橙色 CDN 标签的链接<br>
+                            4. 不想用了点「解绑」，会清空域名与相关记录，节点恢复直连
+                          </div>
+                        </template>
+                      </a-alert>
+                    </a-card>
+</a-form>
+</div>
+<script src="web/assets/vue/vue.min.js"></script>
+<script src="web/assets/ant-design-vue/antd.min.js"></script>
+<script>
+new Vue({el:'#app', data:function(){return {
+  cdnForm:{domain:''}, cdnSaving:false,
+  cdnInfo:{bound:false, domain:'', ips:[], hint:''}
+},},
+methods:{ bindCdn:function(){}, unbindCdn:function(){} }});
+</script></body></html>
