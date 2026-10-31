@@ -210,6 +210,27 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # restore (stop the panel firs
 x-ui -v                   # version
 ```
 
+## Uninstall
+
+**Normal uninstall** (`x-ui → 5`): stops the service, removes the binary, deletes the database in
+`/etc/x-ui`, removes the menu command and the firewall rule for the panel port. The certificate
+directory `/root/cert` is kept on purpose (it may hold certificates for other services).
+
+**Full purge** (database, certificates, subscription system, acme state and logs included):
+
+```bash
+# dry run: list everything that would be deleted, touch nothing
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/scripts/purge.sh) --check
+
+# execute (you must type PURGE to confirm)
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/scripts/purge.sh)
+```
+
+Removes `/usr/local/x-ui`, `/opt/x-panel`, `/etc/x-ui` (database, inbounds, accounts),
+`/opt/sublinkpro`, `/root/cert`, `/root/.acme.sh`, `/etc/letsencrypt`, `/etc/ssl/sublinkpro`,
+`/usr/bin/x-ui`, the related systemd units, the `54321/15268/8000/8443` firewall rules and the acme
+renewal cron. It never touches nginx itself or your other sites.
+
 ## Development & tests
 
 ```bash

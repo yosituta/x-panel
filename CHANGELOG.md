@@ -8,6 +8,26 @@
 
 ---
 
+## 彻底卸载脚本（v1.4.8，2026-11-01）
+
+- 新增 `scripts/purge.sh`：一条命令清干净面板、数据库、证书、订阅系统、acme、日志、防火墙规则、续期 cron。
+  - `--check` 只体检并列出将删除的路径与大小，不动任何文件
+  - 执行需手动输入 `PURGE` 确认
+  - 不碰 nginx 本体和其它站点
+- `x-ui → 5` 仍是普通卸载，按设计保留 `/root/cert`；要连证书一起删用 purge 脚本。
+- README 中英各加「卸载」小节。
+
+实测（测试机 182.255.80.150，完整跑一遍）：
+
+```
+删除 11 项（/opt/x-panel 653M、/etc/x-ui 264K、/opt/sublinkpro 74M、/root/cert、
+            /root/.acme.sh 2.7M、/etc/letsencrypt、/usr/bin/x-ui、2 个 systemd 单元等）
+撤销 ufw 54321/15268/8000/8443
+校验：彻底卸载完成，没有残留
+独立复查：目录全无、服务单元全无、54321 无监听、crontab 清空
+随后用 install.sh --auto --domain us1.bbua.pp.ua 重装成功（LE 证书签发并绑定）
+```
+
 ## 访问域名解析修正（v1.4.7，2026-11-01）
 
 - **修掉「显示 bbua.pp.ua:54321」**：证书保存时通配证书 `*.bbua.pp.ua` 的目录会被规范成

@@ -8,6 +8,28 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Full purge script (v1.4.8, 2026-11-01)
+
+- New `scripts/purge.sh`: one command that wipes the panel, database, certificates, subscription
+  system, acme state, logs, firewall rules and the renewal cron.
+  - `--check` only reports what would be deleted (with sizes) and touches nothing
+  - executing requires typing `PURGE` to confirm
+  - never touches nginx itself or other sites
+- `x-ui → 5` remains the normal uninstall and keeps `/root/cert` by design; use the purge script when
+  the certificates should go too.
+- Added an "Uninstall" section to both READMEs.
+
+Verified on the test machine (182.255.80.150), full cycle:
+
+```
+removed 11 targets (/opt/x-panel 653M, /etc/x-ui 264K, /opt/sublinkpro 74M, /root/cert,
+                    /root/.acme.sh 2.7M, /etc/letsencrypt, /usr/bin/x-ui, 2 systemd units, …)
+revoked ufw rules 54321/15268/8000/8443
+self-check: "彻底卸载完成，没有残留"
+independent re-check: no directories, no units, nothing on 54321, empty crontab
+then reinstalled with install.sh --auto --domain us1.bbua.pp.ua (LE certificate issued and bound)
+```
+
 ## Access-host resolution fixed (v1.4.7, 2026-11-01)
 
 - **"bbua.pp.ua:54321" display fixed**: saving a wildcard certificate (`*.bbua.pp.ua`) normalises the

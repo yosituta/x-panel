@@ -83,7 +83,8 @@ docker compose up -d --build
 - 必须 `network_mode: host`，节点端口才能直接占用
 - 容器内没有 systemd/ufw/nginx，**证书、防火墙、订阅系统**需要在宿主机处理
 
-完整说明（配置项、证书挂载、升级备份、排错）：[docs/DOCKER.md](docs/DOCKER.md)
+完整说明（配置项、证书挂载、升级备份、排错）：[docs/DOCKER.md](docs/DOCKER.md)
+
 
 ### 端口与排序
 
@@ -211,6 +212,26 @@ x-ui backup -list         # 列出快照
 x-ui backup -restore x-ui-20260101-090000.db.gz   # 还原（面板需停止）
 x-ui -v                   # 版本
 ```
+
+## 卸载
+
+**普通卸载**（`x-ui → 5`）：停服务、删程序、删数据库 `/etc/x-ui`、删菜单命令、撤销面板端口防火墙规则。
+证书目录 `/root/cert` 会保留（里面可能有你其它服务的证书）。
+
+**彻底卸载**（连数据库、证书、订阅系统、acme、日志一起删）：
+
+```bash
+# 先体检，列出会删除哪些东西（不删任何文件）
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/scripts/purge.sh) --check
+
+# 确认后执行（需要手动输入 PURGE）
+bash <(curl -Ls https://raw.githubusercontent.com/yosituta/x-panel/main/scripts/purge.sh)
+```
+
+清掉的内容：`/usr/local/x-ui`、`/opt/x-panel`、`/etc/x-ui`（数据库/节点/账号）、
+`/opt/sublinkpro`（订阅系统）、`/root/cert`、`/root/.acme.sh`、`/etc/letsencrypt`、
+`/etc/ssl/sublinkpro`、`/usr/bin/x-ui`、相关 systemd 单元、`54321/15268/8000/8443` 防火墙规则、
+acme 续期 cron。不会动 nginx 本体和其它站点。
 
 ## 开发与测试
 
