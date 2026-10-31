@@ -378,7 +378,7 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v5</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v6</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
@@ -386,12 +386,11 @@
                           <a-input v-model="cdnForm.domain" style="max-width: 420px"
                                    placeholder="cdn.example.com" @pressEnter="bindCdn" />
                           <div style="margin-top: 10px">
-                            <a-button type="primary" :loading="cdnSaving" @click="bindCdn">
-                              <a-icon type="link"></a-icon> 绑定
-                            </a-button>
-                            <a-button style="margin-left: 8px" @click="unbindCdn">
-                              <a-icon type="disconnect"></a-icon> 解绑
-                            </a-button>
+                            <!-- 用原生 button：不依赖 antd 组件注册，确保任何情况下都能显示 -->
+                            <button type="button" class="ant-btn ant-btn-primary" :disabled="cdnSaving" @click="bindCdn">
+                              <span v-if="cdnSaving">保存中…</span><span v-else>绑定</span>
+                            </button>
+                            <button type="button" class="ant-btn" style="margin-left: 8px" @click="unbindCdn">解绑</button>
                             <span style="margin-left: 12px; font-size: 12px; opacity: .55">CDN 保存后立即生效，无需重启</span>
                           </div>
 
