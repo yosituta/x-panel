@@ -184,9 +184,9 @@
                     </a-card>
                     <a-card size="small" title="被控端列表">
                       <a-space style="margin-bottom: 12px" wrap>
-                        <a-input v-model="newPanel.name" placeholder="名称，如 东京" style="width: 140px" />
-                        <a-input v-model="newPanel.url" placeholder="https://域名:端口/路径" style="width: 260px" />
-                        <a-input v-model="newPanel.key" placeholder="被控端 slaveKey" style="width: 240px" />
+                        <a-input v-model="newPanel.name" placeholder="名称，如 东京" style="width: 140px" ></a-input>
+                        <a-input v-model="newPanel.url" placeholder="https://域名:端口/路径" style="width: 260px" ></a-input>
+                        <a-input v-model="newPanel.key" placeholder="被控端 slaveKey" style="width: 240px" ></a-input>
                         <a-checkbox v-model="newPanel.insecure">自签证书/用 IP 访问</a-checkbox>
                         <a-button type="primary" icon="plus" :loading="panelLoading" @click="addPanel">添加</a-button>
                         <a-button icon="reload" @click="loadPanels">刷新</a-button>
@@ -212,7 +212,7 @@
                     <a-card size="small">
                       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 14 }" :colon="false">
                         <a-form-item label="启用">
-                          <a-switch v-model="report.enable" />
+                          <a-switch v-model="report.enable" ></a-switch>
                           <span style="margin-left: 8px; font-size: 12px; opacity: .65">发送到 Telegram 管理员</span>
                         </a-form-item>
                         <a-form-item label="频率">
@@ -223,7 +223,7 @@
                           </a-radio-group>
                         </a-form-item>
                         <a-form-item label="发送时间">
-                          <a-input v-model="report.time" style="width: 120px" placeholder="09:00" />
+                          <a-input v-model="report.time" style="width: 120px" placeholder="09:00" ></a-input>
                           <span style="margin-left: 8px; font-size: 12px; opacity: .65">24 小时制，精确到分钟</span>
                         </a-form-item>
                         <a-form-item label="星期几" v-if="report.interval === 'weekly'">
@@ -238,7 +238,7 @@
                           </a-select>
                         </a-form-item>
                         <a-form-item label="每月几号" v-if="report.interval === 'monthly'">
-                          <a-input-number v-model="report.day" :min="1" :max="31" style="width: 120px" />
+                          <a-input-number v-model="report.day" :min="1" :max="31" style="width: 120px" ></a-input-number>
                         </a-form-item>
                         <a-form-item label="报告内容">
                           <a-checkbox-group v-model="report.content">
@@ -257,7 +257,7 @@
                         </a-form-item>
                       </a-form>
                       <a-textarea v-if="reportPreviewText" v-model="reportPreviewText" readonly
-                        :auto-size="{ minRows: 8, maxRows: 20 }" style="margin-top: 12px; font-family: monospace" />
+                        :auto-size="{ minRows: 8, maxRows: 20 }" style="margin-top: 12px; font-family: monospace" ></a-textarea>
                     </a-card>
                   </a-tab-pane>
                   <a-tab-pane key="9" :style="{ paddingTop: '20px' }">
@@ -303,7 +303,7 @@
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
                         <a-form-item label="域名">
                           <a-input v-model="certForm.domain" style="max-width: 380px"
-                                   placeholder="panel.example.com（留空则从证书自动识别）" />
+                                   placeholder="panel.example.com（留空则从证书自动识别）" ></a-input>
                         </a-form-item>
 
                         <!-- 证书 -->
@@ -328,7 +328,7 @@
                             </div>
                           </div>
                           <a-textarea v-else v-model="certForm.cert" :rows="8"
-                                      placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" />
+                                      placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" ></a-textarea>
                         </a-form-item>
 
                         <!-- 私钥 -->
@@ -353,7 +353,7 @@
                             </div>
                           </div>
                           <a-textarea v-else v-model="certForm.key" :rows="8"
-                                      placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" />
+                                      placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" ></a-textarea>
                         </a-form-item>
 
                         <a-form-item :wrapper-col="{ span: 20, offset: 3 }">
@@ -378,13 +378,13 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v6</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v7</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
                         <a-form-item label="域名">
                           <a-input v-model="cdnForm.domain" style="max-width: 420px"
-                                   placeholder="cdn.example.com" @pressEnter="bindCdn" />
+                                   placeholder="cdn.example.com" @pressEnter="bindCdn"></a-input>
                           <div style="margin-top: 10px">
                             <!-- 用原生 button：不依赖 antd 组件注册，确保任何情况下都能显示 -->
                             <button type="button" class="ant-btn ant-btn-primary" :disabled="cdnSaving" @click="bindCdn">
