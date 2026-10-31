@@ -359,13 +359,17 @@
                         <a-form-item :wrapper-col="{ span: 20, offset: 3 }">
                           <a-space>
                             <a-button type="primary" :loading="certSaving" @click="saveCert">
-                              <a-icon type="check"></a-icon> 保存并重启面板
+                              <a-icon type="save"></a-icon> 保存
+                            </a-button>
+                            <a-button :loading="panelRestarting" @click="restartPanelNow">
+                              <a-icon type="redo"></a-icon> 重启面板
                             </a-button>
                             <a-button @click="resetCertForm">清空表单</a-button>
                             <a-button danger @click="clearCert">移除已绑定证书</a-button>
                           </a-space>
                           <div style="margin-top: 8px; font-size: 12px; opacity: .65">
-                            保存后会校验「私钥是否配对」「证书是否覆盖域名」，通过才写入，约 3 秒后自动重启。
+                            保存只写入配置，<b>重启面板后证书才生效</b>（服务启动时加载证书）。<br>
+                            保存时会校验「私钥是否配对」「证书是否覆盖域名」，不通过不会写入。
                           </div>
                         </a-form-item>
                       </a-form>
@@ -379,12 +383,13 @@
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
                         <a-form-item label="域名">
-                          <a-input-group compact style="display: flex; max-width: 560px">
-                            <a-input v-model="cdnForm.domain" style="width: 70%"
+                          <div style="display: flex; gap: 8px; max-width: 620px">
+                            <a-input v-model="cdnForm.domain" style="flex: 1 1 auto; min-width: 0"
                                      placeholder="cdn.example.com" @pressEnter="bindCdn" />
-                            <a-button type="primary" :loading="cdnSaving" style="width: 15%" @click="bindCdn">绑定</a-button>
-                            <a-button style="width: 15%" @click="unbindCdn">解绑</a-button>
-                          </a-input-group>
+                            <a-button type="primary" :loading="cdnSaving" style="flex: 0 0 88px"
+                                      @click="bindCdn">绑定</a-button>
+                            <a-button style="flex: 0 0 88px" @click="unbindCdn">解绑</a-button>
+                          </div>
 
                           <div style="margin-top: 10px; font-size: 12px" v-if="cdnInfo && cdnInfo.domain">
                             <a-tag v-if="cdnInfo.isCf" color="orange">已绑定 · Cloudflare 生效</a-tag>
@@ -470,6 +475,7 @@
       certInfo: {},
       certSaving: false,
       certForm: { domain: '', cert: '', key: '' },
+      panelRestarting: false,
       certMode: 'upload',
       keyMode: 'upload',
       certFileName: '',
@@ -806,8 +812,7 @@
           if (msg.success) {
             this.certInfo = msg.obj || {};
             this.resetCertForm();
-            this.$message.success('证书已保存，面板将在 3 秒内重启');
-            setTimeout(() => window.location.reload(), 5000);
+            this.$message.success('证书已保存。点「重启面板」后生效（当前连接仍是旧证书）');
           } else {
             this.$message.error(msg.msg || '保存失败');
           }
@@ -820,7 +825,24 @@
         if (!ok) return;
         const msg = await HttpUtil.post('/panel/api/cert/clear', {});
         this.$message[msg.success ? 'success' : 'error'](msg.msg || '已移除');
-        if (msg.success) setTimeout(() => window.location.reload(), 5000);
+        if (msg.success) this.loadCert();
+      },
+      async restartPanelNow() {
+        const ok = await this.$confirm('重启期间面板会断开约 3 秒，确定现在重启吗？', '重启面板');
+        if (!ok) return;
+        this.panelRestarting = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/setting/restartPanel', {});
+          if (msg.success) {
+            this.$message.success('已发出重启指令，3 秒后刷新页面即可');
+            setTimeout(() => window.location.reload(), 6000);
+          } else {
+            this.$message.error(msg.msg || '重启失败');
+            this.panelRestarting = false;
+          }
+        } catch (e) {
+          this.panelRestarting = false;
+        }
       },
       async loadCdn() {
         const msg = await HttpUtil.post('/panel/api/cdn/status', {});
