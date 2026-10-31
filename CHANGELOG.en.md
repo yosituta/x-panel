@@ -8,6 +8,32 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## In-panel certificate / CDN page (v1.4.2, 2026-10-31)
+
+### Added
+
+- **Settings → Certificate / CDN tab**: certificate and key can each be uploaded from a local file
+  or pasted as text; after upload the file name, character count and a preview are shown.
+  Before saving, the key pair and domain coverage are validated — invalid input is not written.
+- **Save and restart are separate**: `[Save]` only writes the configuration, `[Restart panel]` is a
+  distinct action, and the UI states that a restart is required for a certificate to take effect.
+- **CDN domain binding**: type a domain, press `[Bind]` — effective immediately, no restart needed
+  (read at node-generation time). `[Unbind]` clears the domain and related state so nodes go direct again.
+- **UI version probe**: `GET /panel/api/uiinfo` (no login required) returns the current UI marker,
+  so you can tell "server is old" from "browser cached an old page".
+
+### Fixed
+
+- **CDN "Bind / Unbind" buttons were not rendered (root cause)**: self-closing component tags such as
+  `<a-input ... />` are parsed by browsers as *open* tags, so every following sibling became a child of
+  the input. antd's Input does not render child nodes, so the buttons and the status row vanished.
+  All 25 self-closing component tags across `settings.html`, `inbounds.html`, `index.html`,
+  `servers.html` and `login.html` now use explicit closing tags.
+- **Certificate status needed a manual refresh**: state was not fetched on page load; now loaded in `mounted`.
+- **Enter key in the CDN input did nothing**: in-DOM templates lowercase `@pressEnter` to `@pressenter`,
+  which Vue never receives; a wrapper div now handles `keyup.enter`.
+- **Page caching**: page responses now send `Cache-Control: no-store, no-cache, must-revalidate`.
+
 ## One-command install and multi-server deployment (2026-10-26)
 
 ### `install.sh` gains an unattended mode
