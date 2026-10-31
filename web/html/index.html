@@ -568,7 +568,7 @@
 									<a-card title='{{ i18n "pages.index.xrayStatus" }}' hoverable :bordered="true" class="glass-card" :style="{ marginBottom: '16px' }">
 										<template #extra>
 											<template v-if="status.xray.state != 'error'">
-												<a-badge status="processing" class="running-animation" :text="status.xray.stateMsg" :color="status.xray.color"/>
+												<a-badge status="processing" class="running-animation" :text="status.xray.stateMsg" :color="status.xray.color"></a-badge>
 											</template>
 											<template v-else>
 												<a-popover :overlay-class-name="themeSwitcher.currentTheme">
@@ -581,7 +581,7 @@
 													<template slot="content">
 														<span :style="{ maxWidth: '400px' }" v-for="line in status.xray.errorMsg.split('\n')">[[ line ]]</span>
 													</template>
-													<a-badge :text="status.xray.stateMsg" :color="status.xray.color"/>
+													<a-badge :text="status.xray.stateMsg" :color="status.xray.color"></a-badge>
 												</a-popover>
 											</template>
 										</template>
@@ -630,12 +630,12 @@
 												<a-row :gutter="isMobile ? [8,8] : 0">
 													<a-col :span="12">
 														<a-custom-statistic title='{{ i18n "pages.index.sent" }}' :value="SizeFormatter.sizeFormat(status.netTraffic.sent)">
-															<template #prefix><a-icon type="cloud-upload" /></template>
+															<template #prefix><a-icon type="cloud-upload" ></a-icon></template>
 														</a-custom-statistic>
 													</a-col>
 													<a-col :span="12">
 														<a-custom-statistic title='{{ i18n "pages.index.received" }}' :value="SizeFormatter.sizeFormat(status.netTraffic.recv)">
-															<template #prefix><a-icon type="cloud-download" /></template>
+															<template #prefix><a-icon type="cloud-download" ></a-icon></template>
 														</a-custom-statistic>
 													</a-col>
 												</a-row>
@@ -646,12 +646,12 @@
 												<a-row :gutter="isMobile ? [8,8] : 0">
 													<a-col :span="12">
 														<a-custom-statistic title="TCP" :value="status.tcpCount">
-															<template #prefix><a-icon type="swap" /></template>
+															<template #prefix><a-icon type="swap" ></a-icon></template>
 														</a-custom-statistic>
 													</a-col>
 													<a-col :span="12">
 														<a-custom-statistic title="UDP" :value="status.udpCount">
-															<template #prefix><a-icon type="swap" /></template>
+															<template #prefix><a-icon type="swap" ></a-icon></template>
 														</a-custom-statistic>
 													</a-col>
 												</a-row>
@@ -699,13 +699,13 @@
 										<a-row :gutter="isMobile ? [8,8] : 0">
 											<a-col :span="12">
 												<a-custom-statistic title='{{ i18n "pages.index.upload" }}' :value="SizeFormatter.sizeFormat(status.netIO.up)">
-													<template #prefix><a-icon type="arrow-up" /></template>
+													<template #prefix><a-icon type="arrow-up" ></a-icon></template>
 													<template #suffix>/s</template>
 												</a-custom-statistic>
 											</a-col>
 											<a-col :span="12">
 												<a-custom-statistic title='{{ i18n "pages.index.download" }}' :value="SizeFormatter.sizeFormat(status.netIO.down)">
-													<template #prefix><a-icon type="arrow-down" /></template>
+													<template #prefix><a-icon type="arrow-down" ></a-icon></template>
 													<template #suffix>/s</template>
 												</a-custom-statistic>
 											</a-col>
@@ -722,12 +722,12 @@
 										<a-row :class="showIp ? 'ip-visible' : 'ip-hidden'" :gutter="isMobile ? [8,8] : 0">
 											<a-col :span="isMobile ? 24 : 12">
 												<a-custom-statistic title="IPv4" :value="status.publicIP.ipv4">
-													<template #prefix><a-icon type="global" /></template>
+													<template #prefix><a-icon type="global" ></a-icon></template>
 												</a-custom-statistic>
 											</a-col>
 											<a-col :span="isMobile ? 24 : 12">
 												<a-custom-statistic title="IPv6" :value="status.publicIP.ipv6">
-													<template #prefix><a-icon type="global" /></template>
+													<template #prefix><a-icon type="global" ></a-icon></template>
 												</a-custom-statistic>
 											</a-col>
 										</a-row>
@@ -759,7 +759,7 @@
 				<a-list class="ant-version-list" bordered :style="{ width: '100%' }">
 					<a-list-item class="ant-version-list-item" v-for="file, index in ['geosite.dat', 'geoip.dat', 'geosite_IR.dat', 'geoip_IR.dat', 'geosite_RU.dat', 'geoip_RU.dat']">
 						<a-tag :color="index % 2 == 0 ? 'purple' : 'green'">[[ file ]]</a-tag>
-						<a-icon type="reload" @click="updateGeofile(file)" :style="{ marginRight: '8px' }"/>
+						<a-icon type="reload" @click="updateGeofile(file)" :style="{ marginRight: '8px' }"></a-icon>
 					</a-list-item>
 				</a-list>
 				<div style="margin-top: 5px; display: flex; justify-content: flex-end;">
@@ -903,14 +903,14 @@
 					<template #title>{{ i18n "pages.index.exportDatabase" }}</template>
 					<template #description>{{ i18n "pages.index.exportDatabaseDesc" }}</template>
 				</a-list-item-meta>
-				<a-button @click="exportDatabase()" type="primary" icon="download"/>
+				<a-button @click="exportDatabase()" type="primary" icon="download"></a-button>
 			</a-list-item>
 			<a-list-item class="ant-backup-list-item">
 				<a-list-item-meta>
 					<template #title>{{ i18n "pages.index.importDatabase" }}</template>
 					<template #description>{{ i18n "pages.index.importDatabaseDesc" }}</template>
 				</a-list-item-meta>
-				<a-button @click="importDatabase()" type="primary" icon="upload" />
+				<a-button @click="importDatabase()" type="primary" icon="upload" ></a-button>
 			</a-list-item>
 		</a-list>
 	</a-modal>

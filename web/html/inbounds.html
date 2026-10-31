@@ -713,7 +713,7 @@
       @cancel="relayForm.visible = false"
    >
       <a-alert type="info" show-icon style="margin-bottom: 16px"
-        message="入口建在本机，流量经远程 Socks5/HTTP 上游出去；客户端拿到的是本机地址的普通节点。" />
+        message="入口建在本机，流量经远程 Socks5/HTTP 上游出去；客户端拿到的是本机地址的普通节点。" ></a-alert>
       <a-form :label-col="{ span: 7 }" :wrapper-col="{ span: 15 }" :colon="false">
         <a-form-item label="上游类型">
           <a-radio-group v-model="relayForm.upstreamType" button-style="solid">
@@ -722,22 +722,22 @@
           </a-radio-group>
         </a-form-item>
         <a-form-item label="上游地址">
-          <a-input v-model="relayForm.upstreamHost" placeholder="1.2.3.4 或 域名" />
+          <a-input v-model="relayForm.upstreamHost" placeholder="1.2.3.4 或 域名" ></a-input>
         </a-form-item>
         <a-form-item label="上游端口">
-          <a-input-number v-model="relayForm.upstreamPort" :min="1" :max="65535" style="width: 100%" />
+          <a-input-number v-model="relayForm.upstreamPort" :min="1" :max="65535" style="width: 100%" ></a-input-number>
         </a-form-item>
         <a-form-item label="上游用户名">
-          <a-input v-model="relayForm.upstreamUser" placeholder="没有就留空" />
+          <a-input v-model="relayForm.upstreamUser" placeholder="没有就留空" ></a-input>
         </a-form-item>
         <a-form-item label="上游密码">
-          <a-input-password v-model="relayForm.upstreamPass" placeholder="没有就留空" />
+          <a-input-password v-model="relayForm.upstreamPass" placeholder="没有就留空" ></a-input-password>
         </a-form-item>
         <a-form-item label="本机入口端口">
-          <a-input-number v-model="relayForm.port" :min="1024" :max="65535" style="width: 100%" />
+          <a-input-number v-model="relayForm.port" :min="1024" :max="65535" style="width: 100%" ></a-input-number>
         </a-form-item>
         <a-form-item label="备注">
-          <a-input v-model="relayForm.name" placeholder="relay-东京" />
+          <a-input v-model="relayForm.name" placeholder="relay-东京" ></a-input>
         </a-form-item>
         <a-form-item :wrapper-col="{ span: 15, offset: 7 }">
           <a-space>
@@ -747,7 +747,7 @@
         </a-form-item>
       </a-form>
       <a-textarea v-if="relayForm.result" v-model="relayForm.result" readonly
-        :auto-size="{ minRows: 3, maxRows: 8 }" style="margin-top: 8px" />
+        :auto-size="{ minRows: 3, maxRows: 8 }" style="margin-top: 8px" ></a-textarea>
     </a-modal>
     <a-modal
       :title="`{{ i18n "pages.inbounds.oneClick.title" }}`"

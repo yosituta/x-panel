@@ -207,7 +207,7 @@
 
 			<p style="font-weight:bold; margin-top:15px; text-align: left;">👇 VLESS Reality 中转链接：</p>
 			<a-input v-model="resultLink" read-only @click="copyLink">
-				<a-icon slot="addonAfter" type="copy" @click="copyLink" style="cursor: pointer;"/>
+				<a-icon slot="addonAfter" type="copy" @click="copyLink" style="cursor: pointer;"></a-icon>
 			</a-input>
 		</div>
 	</a-modal>
@@ -236,7 +236,7 @@
         >
             <template slot="status" slot-scope="text, record">
                 <span v-if="record.pingLoading">
-                    <a-icon type="loading" /> 检测中...
+                    <a-icon type="loading" ></a-icon> 检测中...
                 </span>
                 <span v-else>
                     <a-tag v-if="record.pingResult === undefined">待检测</a-tag>

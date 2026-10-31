@@ -10,7 +10,7 @@ import (
 // 打开 /panel/api/uiinfo 就能确认服务器实际提供的是哪一版界面：
 //   - 返回的 ui 字段是新值  → 服务端已是新版，看到的旧界面是缓存
 //   - 返回的 ui 字段是旧值  → 服务端确实没更新
-const uiTag = "2026-10-31-cert-cdn-v7"
+const uiTag = "2026-10-31-cert-cdn-v8"
 
 type UIController struct {
 	BaseController
