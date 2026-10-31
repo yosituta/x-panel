@@ -312,6 +312,8 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	controller.NewCertController(g)
 	// 【开源增强】CDN 域名：面板内设置/修改/清除
 	controller.NewCdnController(g)
+	// 【开源增强】界面版本探针（公开）
+	controller.NewUIController(g)
 	// 【开源增强】多面板：被控端 API（靠 slaveKey 鉴权）
 	controller.NewSlaveController(g)
 	// 【开源增强】多面板：主控端管理接口（需登录）
