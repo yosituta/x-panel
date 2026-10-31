@@ -378,17 +378,21 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v5</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
                         <a-form-item label="域名">
-                          <div style="display: flex; gap: 8px; max-width: 620px">
-                            <a-input v-model="cdnForm.domain" style="flex: 1 1 auto; min-width: 0"
-                                     placeholder="cdn.example.com" @pressEnter="bindCdn" />
-                            <a-button type="primary" :loading="cdnSaving" style="flex: 0 0 88px"
-                                      @click="bindCdn">绑定</a-button>
-                            <a-button style="flex: 0 0 88px" @click="unbindCdn">解绑</a-button>
+                          <a-input v-model="cdnForm.domain" style="max-width: 420px"
+                                   placeholder="cdn.example.com" @pressEnter="bindCdn" />
+                          <div style="margin-top: 10px">
+                            <a-button type="primary" :loading="cdnSaving" @click="bindCdn">
+                              <a-icon type="link"></a-icon> 绑定
+                            </a-button>
+                            <a-button style="margin-left: 8px" @click="unbindCdn">
+                              <a-icon type="disconnect"></a-icon> 解绑
+                            </a-button>
+                            <span style="margin-left: 12px; font-size: 12px; opacity: .55">CDN 保存后立即生效，无需重启</span>
                           </div>
 
                           <div style="margin-top: 10px; font-size: 12px" v-if="cdnInfo && cdnInfo.domain">
@@ -1142,6 +1146,10 @@
       }
     },
     async mounted() {
+      // 【开源增强】证书 / CDN 状态：进页面就加载，避免显示成"未绑定"
+      this.loadCert();
+      this.loadCdn();
+
       // 【修改点 3：页面加载时检查 URL 参数】
       // 如果 URL 包含 ?tab=telegram，则自动跳转到 Telegram 配置 (Key='3')
       const params = new URLSearchParams(window.location.search);
