@@ -414,6 +414,13 @@ panel_cert_host() {
                | sed -n 's/.*CN *= *//p' | head -1)
     fi
     if [[ -z "$host" || "$host" == "selfsigned" || "$host" =~ ^[0-9.]+$ || "$host" =~ : ]]; then
+        # 自签兜底：优先用安装时记下的域名（/root/cert/.panel_domain），
+        # 这样即使证书是自签的，登录地址也显示你自己的域名而不是 IP
+        if [[ -s /root/cert/.panel_domain ]]; then
+            local saved
+            saved=$(head -1 /root/cert/.panel_domain 2>/dev/null | tr -d '[:space:]')
+            if [[ -n "$saved" ]]; then echo "$saved"; return; fi
+        fi
         ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
         [[ -z "$ip" ]] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
         [[ -n "$ip" ]] && host="$ip"

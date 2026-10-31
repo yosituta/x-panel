@@ -17,6 +17,10 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 - **Self-signed certificates are called out explicitly**, and the script scans for existing real
   certificates on the machine (`/root/cert/*`, `/etc/letsencrypt/live/*`) and prints the exact
   re-bind command instead of asking you to re-issue.
+- **The self-signed fallback remembers your domain**: when issuance fails, the fallback certificate
+  uses your domain as CN (not the IP) and the domain is stored in `/root/cert/.panel_domain`.
+  The login URL prefers that value, so the panel shows `https://your-domain:54321/` even while the
+  certificate is self-signed, instead of an IP or "selfsigned".
 - **`18 → 6 Show existing domains`** now prints the real domain from the certificate and marks
   self-signed ones as "emergency access only".
 - **Updating/ reinstalling no longer overwrites a bound certificate**: previously running the installer

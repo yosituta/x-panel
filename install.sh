@@ -192,22 +192,35 @@ auto_install() {
     # 否则面板会因为没有证书而强制只监听 127.0.0.1，外网直接连不上。
     make_self_signed() {
         mkdir -p "$self_dir"
-        local ip
+        local ip host cur
         ip=$(curl -s4 --max-time 6 https://api.ipify.org 2>/dev/null)
         [ -z "$ip" ] && ip=$(hostname -I 2>/dev/null | awk '{print $1}')
         [ -z "$ip" ] && ip="127.0.0.1"
-        if [ ! -s "$self_dir/fullchain.pem" ]; then
+        # 有域名时：自签证书的 CN 用域名（而不是 IP），并记录到 /root/cert/.panel_domain，
+        # 这样「查看面板设置」里的登录地址会是你的域名，不会变成 IP 或 selfsigned
+        host="${A_DOMAIN:-$ip}"
+        if [ -n "${A_DOMAIN:-}" ]; then
+            mkdir -p /root/cert && echo "$A_DOMAIN" > /root/cert/.panel_domain
+        fi
+        cur=""
+        [ -s "$self_dir/fullchain.pem" ] && cur=$(openssl x509 -in "$self_dir/fullchain.pem" -noout -subject 2>/dev/null \
+            | sed -n 's/.*CN *= *//p' | head -1)
+        if [ "$cur" != "$host" ]; then
             openssl req -x509 -nodes -newkey rsa:2048 \
                 -keyout "$self_dir/privkey.pem" -out "$self_dir/fullchain.pem" \
-                -days 3650 -subj "/CN=${ip}" >/dev/null 2>&1 && \
-                chmod 600 "$self_dir/privkey.pem"
+                -days 3650 -subj "/CN=${host}" \
+                -addext "subjectAltName=DNS:${host},IP:${ip}" >/dev/null 2>&1 \
+            || openssl req -x509 -nodes -newkey rsa:2048 \
+                -keyout "$self_dir/privkey.pem" -out "$self_dir/fullchain.pem" \
+                -days 3650 -subj "/CN=${host}" >/dev/null 2>&1
+            chmod 600 "$self_dir/privkey.pem" 2>/dev/null || true
         fi
         [ -s "$self_dir/fullchain.pem" ] || return 1
         ./x-ui cert -webCert "$self_dir/fullchain.pem" \
                     -webCertKey "$self_dir/privkey.pem" >/dev/null 2>&1 || true
         cert_done=1
         self_signed=1
-        echo "  已启用自签证书：$self_dir（10 年，CN=${ip}）"
+        echo "  已启用自签证书：$self_dir（10 年，CN=${host}）"
         return 0
     }
 
