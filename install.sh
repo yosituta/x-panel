@@ -72,6 +72,18 @@ auto_install() {
         echo -e "${red}不支持的架构：$(uname -m)${plain}"; return 1
     fi
 
+    # 【重要】没传 --domain 时，沿用上次安装记下的域名（/root/cert/.panel_domain）。
+    # 场景：用域名安装但证书没签成（80 被占/宝塔占用），退回自签；
+    # 之后「更新面板」不带 --domain，如果这里不恢复，登录地址就会变成 IP 或 selfsigned。
+    if [[ -z "$A_DOMAIN" && -s /root/cert/.panel_domain ]]; then
+        A_DOMAIN=$(head -1 /root/cert/.panel_domain 2>/dev/null | tr -d '[:space:]')
+        [[ -n "$A_DOMAIN" ]] && echo "  沿用上次安装的域名：${A_DOMAIN}（来自 /root/cert/.panel_domain）"
+    fi
+    # 传了域名就记录下来，供后续更新/查看设置使用
+    if [[ -n "$A_DOMAIN" ]]; then
+        mkdir -p /root/cert && echo "$A_DOMAIN" > /root/cert/.panel_domain
+    fi
+
     # 默认不加密路径；传 --path /xxx 才会设置
     if [[ -z "$A_PATH" || "$A_PATH" == "/" ]]; then
         A_PATH="/"
