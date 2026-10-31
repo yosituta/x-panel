@@ -8,6 +8,23 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Domain preserved across updates (v1.4.4, 2026-10-31)
+
+- **`Update panel` without `--domain` reuses the previously installed domain**, stored in
+  `/root/cert/.panel_domain`. Typical case: installed with a domain but issuance failed (port 80 held
+  by BaoTa's nginx) and the panel fell back to a self-signed certificate — after an update the printed
+  login address and `x-ui → 10` both stay `https://your-domain:54321/` instead of
+  `https://selfsigned:54321/` or a bare IP.
+- The self-signed certificate uses the domain as CN, so `18 → 6` shows the domain too.
+
+Verified against the real `install.sh` on GitHub from a live server:
+
+```
+no --domain  → 沿用上次安装的域名：hk-test.example.com
+               HTTPS: yes, domain hk-test.example.com
+with --domain → HTTPS: yes, domain us2.bbua.pp.ua (record updated)
+```
+
 ## Certificate access URL (v1.4.3, 2026-10-31)
 
 - **Login URL no longer shows "selfsigned"**: `x-ui → 10 Show panel settings` used the certificate's
