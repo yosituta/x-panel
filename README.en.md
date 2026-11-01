@@ -210,6 +210,31 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # restore (stop the panel firs
 x-ui -v                   # version
 ```
 
+## Certificate expiry reminders
+
+acme renewals need exclusive use of port 80, which nginx or BaoTa often holds, so automatic renewal
+can fail. The panel therefore **warns you before the certificate expires** so you can free the port in
+time.
+
+Settings → Certificate / CDN → "Certificate expiry reminders":
+
+- channels are **multi-select**: Telegram (reuses the token and chat IDs from the Telegram bot
+  settings), ntfy, Webhook
+- reminder days are configurable, e.g. `15,7,3` fires 15, 7 and 3 days before expiry (at most once per
+  day per reminder point)
+- the card shows the days remaining for the current certificate and warns when port 80 is occupied
+- "Send test" verifies the channels immediately
+
+Webhook posts JSON:
+
+```json
+{ "title": "证书到期提醒", "text": "domain … expires … 3 days left …",
+  "source": "x-panel", "type": "cert-expiry", "sentAt": "2026-11-01T12:00:00+08:00" }
+```
+
+ntfy is `POST <server>/<topic>` with `Title` and `Tags: warning` headers; subscribe to the same topic
+in the ntfy app.
+
 ## Uninstall
 
 **Normal uninstall** (`x-ui → 5`): stops the service, removes the binary, deletes the database in

@@ -158,6 +158,23 @@ func runWebServer() {
 		}
 	}()
 
+	// 【开源增强】证书到期提醒：每小时检查一次，命中设定的提醒天数就推送
+	// （acme 续期需要独占 80 端口，常因 nginx/宝塔占用失败，所以必须提前提醒人去处理）
+	go func() {
+		time.Sleep(30 * time.Second)
+		notifyTicker := time.NewTicker(time.Hour)
+		defer notifyTicker.Stop()
+		var certNotify service.CertNotifyService
+		for {
+			<-notifyTicker.C
+			if n, err := certNotify.Check(); err != nil {
+				logger.Warning("[证书提醒] 检查失败:", err)
+			} else if n > 0 {
+				logger.Info("[证书提醒] 本次推送", n, "条")
+			}
+		}
+	}()
+
 	sigCh := make(chan os.Signal, 1)
 	// Trap shutdown signals
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM)

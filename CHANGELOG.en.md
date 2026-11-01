@@ -37,6 +37,39 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Certificate expiry reminders (v1.4.14, 2026-11-01)
+
+Context: acme standalone renewals need exclusive use of port 80, which nginx/BaoTa often occupies, so
+automatic renewal can fail. The panel now warns before expiry so the port can be freed in time.
+
+- Settings → Certificate / CDN gains a "Certificate expiry reminders" card
+- **multi-select channels**: Telegram (reuses the Telegram bot token/chat IDs), ntfy, Webhook
+- **configurable reminder days** (e.g. `15,7,3`); each reminder point fires at most once per day
+  (state stored in `certNotifyState`)
+- the card shows days remaining and warns when port 80 is occupied (stop nginx before renewing)
+- "Send test" verifies the channels immediately
+- the backend checks hourly (first run 30 s after start), log tag `[证书提醒]`
+
+Endpoints:
+
+```
+POST {basePath}panel/api/certnotify/status   config + certificate state
+POST {basePath}panel/api/certnotify/save     save (channels/days as comma-separated strings)
+POST {basePath}panel/api/certnotify/test     send one test message
+```
+
+Webhook payload: `{title, text, source:"x-panel", type:"cert-expiry", sentAt}`.
+ntfy: `POST <server>/<topic>` with `Title` / `Tags: warning` headers.
+
+Tests (Go, local httptest acting as the receiver):
+
+```
+--- PASS: TestCertNotifySendChannels   (both ntfy and webhook received, fields/headers correct)
+--- PASS: TestCertNotifyMissingConfig  (missing settings return errors instead of silent success)
+```
+
 ## "Saved access path does not take effect" fixed (v1.4.13, 2026-11-01)
 
 - **Root cause**: the restart button in the settings page posted to

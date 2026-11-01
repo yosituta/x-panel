@@ -36,6 +36,38 @@
 
 ---
 
+---
+
+## 证书到期提醒（v1.4.14，2026-11-01）
+
+背景：acme standalone 续期要独占 80 端口，机器上常有 nginx/宝塔占着 → 自动续期会失败。
+所以加"到期前主动提醒"，让人及时腾端口。
+
+- 面板设置 → 证书 / CDN → 新增「证书到期提醒」卡片
+- **渠道可多选**：Telegram（复用 Telegram 机器人配置里的 Token / Chat ID）、ntfy、Webhook
+- **提醒天数自填**（如 `15,7,3`），同一提醒点每天最多推一次（状态记录在 `certNotifyState`）
+- 状态卡实时显示证书剩余天数；检测到 80 端口被占用会提示先 `systemctl stop nginx`
+- 「发送测试」立即验证渠道
+- 后端每小时检查一次（启动后 30 秒开始），日志关键字 `[证书提醒]`
+
+接口：
+
+```
+POST {basePath}panel/api/certnotify/status   查看配置/证书情况
+POST {basePath}panel/api/certnotify/save     保存（channels、days 用逗号分隔字符串）
+POST {basePath}panel/api/certnotify/test     发一条测试
+```
+
+Webhook 负载：`{title, text, source:"x-panel", type:"cert-expiry", sentAt}`；
+ntfy：`POST <server>/<topic>` + `Title`/`Tags: warning` 头。
+
+测试（Go 单测，本地 httptest 冒充接收端）：
+
+```
+--- PASS: TestCertNotifySendChannels   （ntfy 与 webhook 都收到请求，字段/头正确）
+--- PASS: TestCertNotifyMissingConfig  （缺参数时返回错误，不静默成功）
+```
+
 ## 修复「改访问路径保存了却不生效」（v1.4.13，2026-11-01）
 
 - **根因**：面板设置页的重启按钮调用的是 `/panel/api/setting/restartPanel`，

@@ -428,6 +428,86 @@
                         </template>
                       </a-alert>
                     </a-card>
+
+                    <!-- ===== 证书到期提醒 ===== -->
+                    <a-card size="small" title="证书到期提醒" style="margin-top: 12px">
+                      <template #extra>
+                        <span style="font-size: 12px; opacity: .65">
+                          到期前按设定的天数推送，渠道可多选 · UI v14
+                        </span>
+                      </template>
+
+                      <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
+                        <a-form-item label="启用">
+                          <a-switch v-model="certNotify.config.enable"></a-switch>
+                          <span style="margin-left: 10px; font-size: 12px; opacity: .65">
+                            <template v-if="certNotify.domain">
+                              当前证书：<span v-text="certNotify.domain"></span> ·
+                              到期 <span v-text="certNotify.notAfter"></span> ·
+                              剩余 <span v-text="certNotify.daysLeft"></span> 天
+                            </template>
+                            <template v-else>尚未绑定证书</template>
+                          </span>
+                        </a-form-item>
+
+                        <a-form-item label="渠道">
+                          <a-checkbox-group v-model="certNotify.config.channels">
+                            <a-checkbox value="tg">Telegram</a-checkbox>
+                            <a-checkbox value="ntfy">ntfy</a-checkbox>
+                            <a-checkbox value="webhook">Webhook</a-checkbox>
+                          </a-checkbox-group>
+                          <div style="margin-top: 4px; font-size: 12px; opacity: .6">
+                            Telegram 用「Telegram机器人配置」里的 Token 与 Chat ID
+                          </div>
+                        </a-form-item>
+
+                        <a-form-item label="提醒天数">
+                          <a-input v-model="certNotifyDaysText" style="max-width: 220px"
+                                   placeholder="15,7,3"></a-input>
+                          <span style="margin-left: 10px; font-size: 12px; opacity: .65">
+                            逗号分隔，到期前还剩这些天时各推一次
+                          </span>
+                        </a-form-item>
+
+                        <template v-if="certNotify.config.channels.includes('ntfy')">
+                          <a-form-item label="ntfy 地址">
+                            <a-input v-model="certNotify.config.ntfyServer" style="max-width: 320px"
+                                     placeholder="https://ntfy.sh"></a-input>
+                          </a-form-item>
+                          <a-form-item label="ntfy 主题">
+                            <a-input v-model="certNotify.config.ntfyTopic" style="max-width: 220px"
+                                     placeholder="例如 my-panel-cert"></a-input>
+                            <span style="margin-left: 10px; font-size: 12px; opacity: .65">
+                              手机装 ntfy App 订阅同名主题即可收到
+                            </span>
+                          </a-form-item>
+                        </template>
+
+                        <a-form-item v-if="certNotify.config.channels.includes('webhook')" label="Webhook">
+                          <a-input v-model="certNotify.config.webhookUrl" style="max-width: 520px"
+                                   placeholder="https://example.com/hook"></a-input>
+                          <div style="margin-top: 4px; font-size: 12px; opacity: .6">
+                            以 POST JSON 发送：{ title, text, source, type: cert-expiry, sentAt }
+                          </div>
+                        </a-form-item>
+
+                        <a-form-item :wrapper-col="{ span: 20, offset: 3 }">
+                          <a-space>
+                            <a-button type="primary" :loading="certNotifySaving" @click="saveCertNotify">
+                              <a-icon type="save"></a-icon> 保存
+                            </a-button>
+                            <a-button :loading="certNotifyTesting" @click="testCertNotify">发送测试</a-button>
+                          </a-space>
+                          <div style="margin-top: 8px; font-size: 12px; opacity: .65">
+                            提醒只负责通知；续期仍要手动：<code>x-ui → 18 → 3</code>。
+                            80 端口被 nginx/宝塔占用时先 <code>systemctl stop nginx</code>，签完再 <code>systemctl start nginx</code>。
+                          </div>
+                          <div v-if="certNotify.port80Busy" style="margin-top: 6px; font-size: 12px; color: #fa8c16">
+                            注意：检测到 80 端口当前被占用，自动续期会失败。
+                          </div>
+                        </a-form-item>
+                      </a-form>
+                    </a-card>
                   </a-tab-pane>
 
                 </a-tabs>
@@ -486,6 +566,13 @@
       report: { enable: false, interval: 'daily', time: '09:00', weekday: 1, day: 1, content: ['server', 'traffic', 'inbounds'] },
       // 【开源增强】面板证书
       certInfo: {},
+      certNotify: {
+        config: { enable: false, channels: [], days: [15, 7, 3], ntfyServer: 'https://ntfy.sh', ntfyTopic: '', webhookUrl: '' },
+        domain: '', notAfter: '', daysLeft: 0, port80Busy: false
+      },
+      certNotifyDaysText: '15,7,3',
+      certNotifySaving: false,
+      certNotifyTesting: false,
       certSaving: false,
       certForm: { domain: '', cert: '', key: '' },
       panelRestarting: false,
@@ -881,6 +968,47 @@
           }
         }, 2000);
       },
+      async loadCertNotify() {
+        const msg = await HttpUtil.post('/panel/api/certnotify/status', {});
+        if (msg.success && msg.obj) {
+          this.certNotify = msg.obj;
+          this.certNotifyDaysText = (msg.obj.config && msg.obj.config.days || [15, 7, 3]).join(',');
+        }
+      },
+      async saveCertNotify() {
+        this.certNotifySaving = true;
+        try {
+          const days = (this.certNotifyDaysText || '')
+            .split(',').map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+          const cfg = this.certNotify.config;
+          const msg = await HttpUtil.post('/panel/api/certnotify/save', {
+            enable: cfg.enable,
+            channels: (cfg.channels || []).join(','),
+            days: days.join(','),
+            ntfyServer: cfg.ntfyServer || '',
+            ntfyTopic: cfg.ntfyTopic || '',
+            webhookUrl: cfg.webhookUrl || ''
+          });
+          if (msg.success) {
+            this.$message.success(msg.msg || '已保存');
+            this.loadCertNotify();
+          } else {
+            this.$message.error(msg.msg || '保存失败');
+          }
+        } finally {
+          this.certNotifySaving = false;
+        }
+      },
+      async testCertNotify() {
+        this.certNotifyTesting = true;
+        try {
+          const msg = await HttpUtil.post('/panel/api/certnotify/test', {});
+          if (msg.success) this.$message.success(msg.msg || '已发送');
+          else this.$message.error(msg.msg || '发送失败');
+        } finally {
+          this.certNotifyTesting = false;
+        }
+      },
       async loadCdn() {
         const msg = await HttpUtil.post('/panel/api/cdn/status', {});
         if (msg.success) {
@@ -1167,6 +1295,7 @@
 
       await this.getAllSetting();
       // 【开源增强】初始化数据快照与多面板列表
+      this.loadCertNotify();
       this.loadBackups();
       this.loadPanels();
       this.loadReport();

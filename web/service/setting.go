@@ -30,6 +30,14 @@ var defaultValueMap = map[string]string{
 	"webPort":            "13688",
 	"webCertFile":        "",
 	"cdnDomain":          "", // 【开源增强】CDN 域名（可在面板里设置/修改/清除）
+	// 【开源增强】证书到期提醒（多渠道路径：tg / ntfy / webhook）
+	"certNotifyEnable":     "false",
+	"certNotifyChannels":   "",
+	"certNotifyDays":       "15,7,3",
+	"certNotifyNtfyServer": "https://ntfy.sh",
+	"certNotifyNtfyTopic":  "",
+	"certNotifyWebhook":    "",
+	"certNotifyState":      "{}",
 	"webKeyFile":         "",
 	"secret":             random.Seq(32),
 	"webBasePath":        "/",
