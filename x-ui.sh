@@ -1373,11 +1373,28 @@ ssl_cert_issue_main() {
                         --key-file "/root/cert/${domain}/privkey.pem" \
                         --fullchain-file "/root/cert/${domain}/fullchain.pem" >/dev/null 2>&1
                     LOGI "已强制更新域名的证书：$domain"
-                    # 若面板正绑着它，重启后生效
-                    local cur_cert2
+                    # 续期只更新文件；如果面板绑的不是这张，问一句要不要换上，
+                    # 否则会出现「证书签成功了，浏览器还是不安全」——因为面板还在用旧的自签证书。
+                    local cur_cert2 new_cert
                     cur_cert2=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
-                    if [[ -n "$cur_cert2" && "$cur_cert2" == /root/cert/${domain}/* ]]; then
-                        echo -e "${yellow}  面板当前就用这张证书，重启面板后生效：x-ui → 13${plain}"
+                    new_cert="/root/cert/${domain}/fullchain.pem"
+                    if [[ -s "$new_cert" ]]; then
+                        if [[ "$cur_cert2" == "$new_cert" ]]; then
+                            echo -e "${yellow}  面板当前就用这张证书，重启面板后生效：x-ui → 13${plain}"
+                        else
+                            echo ""
+                            echo -e "${yellow}  面板当前绑定的是：${cur_cert2:-（无证书）}${plain}"
+                            echo -e "${green}  刚续期的是：${new_cert}${plain}"
+                            read -rp "  要把它设为面板证书吗？（你访问面板用的就是这张）[Y/n]: " yn
+                            if [[ -z "$yn" || "$yn" =~ ^[Yy] ]]; then
+                                /usr/local/x-ui/x-ui cert -webCert "$new_cert" \
+                                    -webCertKey "/root/cert/${domain}/privkey.pem" >/dev/null 2>&1 \
+                                    && echo -e "${green}  已绑定到面板${plain}"
+                                echo -e "${yellow}  重启面板后生效：x-ui → 13${plain}（不重启仍是旧证书）"
+                            else
+                                echo "  未改动面板绑定（可用 18 → 7 手动指定）"
+                            fi
+                        fi
                     fi
                 else
                     echo -e "${red}  更新失败，见上方 acme 输出${plain}"

@@ -8,6 +8,29 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+---
+
+## Auto-bind after renewal (v1.4.10, 2026-11-01)
+
+- **"Certificate renewed but the browser still warns" fixed**: `18 → 3 renew` used to update only the
+  files under `/root/cert/<dir>`; when the panel was bound to a different directory (e.g. `selfsigned`)
+  it never used the new certificate. After a successful renewal the script now compares the panel's
+  binding: same file → "restart to take effect"; different file → prints both paths and asks
+  "set it as the panel certificate? [Y/n]", binding immediately on Y.
+- Root cause: a certificate sitting on disk and the panel actually using it are two different things —
+  only `x-ui cert -webCert` plus a restart flips what the panel serves.
+
+Verified end-to-end on a live server:
+
+```
+initial: panel bound to /root/cert/selfsigned (issuer=CN=us1.bbua.pp.ua, self-signed)
+18 → 3 → answer y
+  panel currently bound: /root/cert/selfsigned/fullchain.pem
+  just renewed:          /root/cert/us1.bbua.pp.ua/fullchain.pem
+  bound to panel → restart required
+after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 2027-01-30)
+```
+
 ## Certificate revoke & renewal fixes (v1.4.9, 2026-11-01)
 
 - **Revoking a certificate no longer loops forever**: `18 → 2` used to call only `acme.sh --revoke`,
