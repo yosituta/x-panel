@@ -933,10 +933,15 @@
           content: '重启期间面板会断开约 3 秒，页面会自动重连，确定现在重启吗？'
         });
         if (!ok) return;
-        // 保存时可能改了访问路径，重启后要跳到新路径，不能还停在旧地址上
+        // 保存时可能改了端口/路径，重启后要跳到「新端口 + 新路径」，
+        // 否则浏览器还停在旧端口上，只会看到连接超时，误以为没生效
         let newBase = (this.allSetting && this.allSetting.webBasePath) || '/';
         if (!newBase.startsWith('/')) newBase = '/' + newBase;
         if (!newBase.endsWith('/')) newBase += '/';
+        const newPort = (this.allSetting && this.allSetting.webPort) || '';
+        const curPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+        const portPart = (newPort && String(newPort) !== String(curPort)) ? (':' + newPort) : '';
+        const origin = window.location.protocol + '//' + window.location.hostname + portPart;
 
         this.panelRestarting = true;
         this.$message.loading('正在重启面板…', 0);
@@ -951,19 +956,19 @@
         const timer = setInterval(async () => {
           tries++;
           try {
-            const res = await fetch(newBase + 'panel/api/uiinfo', { cache: 'no-store' });
+            const res = await fetch(origin + newBase + 'panel/api/uiinfo', { cache: 'no-store' });
             if (res.ok) {
               clearInterval(timer);
               this.$message.destroy();
-              this.$message.success('面板已重启，正在打开新地址：' + newBase);
-              setTimeout(() => { window.location.href = newBase + 'panel/settings'; }, 800);
+              this.$message.success('面板已重启，正在打开新地址：' + origin + newBase);
+              setTimeout(() => { window.location.href = origin + newBase + 'panel/settings'; }, 800);
               return;
             }
           } catch (e) { /* 还没起来 */ }
           if (tries > 30) {
             clearInterval(timer);
             this.$message.destroy();
-            this.$message.error('重启超时，请手动打开：' + newBase + 'panel/settings（或 x-ui → 14 检查状态）');
+            this.$message.error('重启超时，请手动打开：' + origin + newBase + 'panel/settings（或 x-ui → 14 检查状态）');
             this.panelRestarting = false;
           }
         }, 2000);

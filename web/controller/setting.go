@@ -68,6 +68,11 @@ func (a *SettingController) updateSetting(c *gin.Context) {
 		return
 	}
 	err = a.settingService.UpdateAllSetting(allSetting)
+	if err == nil && allSetting.WebPort > 0 {
+		// 【开源增强】改端口后自动放行防火墙，否则新端口外部连不上
+		// （以前只放行过旧端口，用户改成 1999 后访问直接超时）
+		service.EnsureFirewallPort(allSetting.WebPort)
+	}
 	jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 }
 
