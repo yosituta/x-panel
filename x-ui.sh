@@ -460,6 +460,41 @@ panel_free_port80() {
     return 0
 }
 
+# 正式证书签发/续期成功后：自动挂到面板上
+# 规则：
+#   面板没证书        → 直接挂（没有别的选择）
+#   面板绑的是自签证书 → 直接挂（自签本来就是应急）
+#   面板绑着别的正式证书 → 不动，返回 1 交给调用方询问
+panel_adopt_cert() {
+    local new_cert="$1" new_key="$2" cur=""
+    [[ -s "$new_cert" && -s "$new_key" ]] || return 1
+    cur=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
+    if [[ "$cur" == "$new_cert" ]]; then
+        echo -e "${yellow}  面板已绑定该证书，重启后生效：x-ui → 13${plain}"
+        return 0
+    fi
+    local cur_self=0
+    [[ -n "$cur" ]] && panel_cert_is_selfsigned "$cur" && cur_self=1
+    if [[ -z "$cur" || "$cur_self" == "1" ]]; then
+        /usr/local/x-ui/x-ui cert -webCert "$new_cert" -webCertKey "$new_key" >/dev/null 2>&1
+        echo -e "${green}  已自动挂到面板：$new_cert${plain}"
+        [[ -n "$cur" ]] && echo -e "${green}  （替换掉原来的临时自签证书）${plain}"
+        return 0
+    fi
+    return 1
+}
+
+# 问一句要不要立刻重启面板（默认 Y）
+panel_offer_restart() {
+    local yn
+    read -rp "  现在重启面板让证书立即生效？[Y/n]: " yn
+    if [[ -z "$yn" || "$yn" =~ ^[Yy] ]]; then
+        restart
+    else
+        echo -e "${yellow}  稍后记得自己重启：x-ui → 13${plain}"
+    fi
+}
+
 panel_restore_nginx() {
     systemctl start nginx >/dev/null 2>&1 && echo "  已恢复 nginx"
 }
@@ -1379,22 +1414,22 @@ ssl_cert_issue_main() {
                     cur_cert2=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
                     new_cert="/root/cert/${domain}/fullchain.pem"
                     if [[ -s "$new_cert" ]]; then
-                        if [[ "$cur_cert2" == "$new_cert" ]]; then
-                            echo -e "${yellow}  面板当前就用这张证书，重启面板后生效：x-ui → 13${plain}"
-                        else
+                        if ! panel_adopt_cert "$new_cert" "/root/cert/${domain}/privkey.pem"; then
                             echo ""
-                            echo -e "${yellow}  面板当前绑定的是：${cur_cert2:-（无证书）}${plain}"
+                            echo -e "${yellow}  面板当前绑定的是另一张正式证书：${cur_cert2}${plain}"
                             echo -e "${green}  刚续期的是：${new_cert}${plain}"
-                            read -rp "  要把它设为面板证书吗？（你访问面板用的就是这张）[Y/n]: " yn
-                            if [[ -z "$yn" || "$yn" =~ ^[Yy] ]]; then
+                            read -rp "  要换成本次续期的这张吗？[y/N]: " yn
+                            if [[ "$yn" =~ ^[Yy] ]]; then
                                 /usr/local/x-ui/x-ui cert -webCert "$new_cert" \
                                     -webCertKey "/root/cert/${domain}/privkey.pem" >/dev/null 2>&1 \
-                                    && echo -e "${green}  已绑定到面板${plain}"
-                                echo -e "${yellow}  重启面板后生效：x-ui → 13${plain}（不重启仍是旧证书）"
+                                    && echo -e "${green}  已换绑${plain}"
                             else
-                                echo "  未改动面板绑定（可用 18 → 7 手动指定）"
+                                echo "  保持原绑定不变"
+                                ssl_cert_issue_main
+                                return 0
                             fi
                         fi
+                        panel_offer_restart
                     fi
                 else
                     echo -e "${red}  更新失败，见上方 acme 输出${plain}"

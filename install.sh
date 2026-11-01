@@ -260,10 +260,17 @@ auto_install() {
         # --days 75：90 天证书在剩余 15 天时续期
         if [[ "$use_cert" == "1" ]] && /root/.acme.sh/acme.sh --issue -d "$A_DOMAIN" --standalone -k ec-256 --days 75 --force >/tmp/xp-acme.log 2>&1; then
             mkdir -p "/root/cert/${A_DOMAIN}"
+            # 续期钩子：证书更新后自动挂到面板（仅当面板是自签/无证书），再重启
+            if [[ -f scripts/adopt-cert.sh ]]; then
+                cp -f scripts/adopt-cert.sh /usr/local/x-ui/adopt-cert.sh 2>/dev/null
+                chmod +x /usr/local/x-ui/adopt-cert.sh 2>/dev/null
+            fi
+            local reloadcmd="x-ui restart"
+            [[ -x /usr/local/x-ui/adopt-cert.sh ]] && reloadcmd="/usr/local/x-ui/adopt-cert.sh ${A_DOMAIN}"
             /root/.acme.sh/acme.sh --install-cert -d "$A_DOMAIN" --ecc \
                 --key-file "/root/cert/${A_DOMAIN}/privkey.pem" \
                 --fullchain-file "/root/cert/${A_DOMAIN}/fullchain.pem" \
-                --reloadcmd "x-ui restart" >/dev/null 2>&1
+                --reloadcmd "$reloadcmd" >/dev/null 2>&1
             if [[ -f "/root/cert/${A_DOMAIN}/fullchain.pem" ]]; then
                 # 绑定证书必须用顶层 cert 子命令；写成 setting -webCert 会被静默忽略
                 ./x-ui cert -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \

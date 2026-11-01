@@ -31,7 +31,30 @@ initial: panel bound to /root/cert/selfsigned (issuer=CN=us1.bbua.pp.ua, self-si
 after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 2027-01-30)
 ```
 
-## Certificate revoke & renewal fixes (v1.4.9, 2026-11-01)
+---
+
+## Automatic certificate adoption (v1.4.11, 2026-11-01)
+
+- **A newly issued public certificate is bound to the panel automatically** — no more manual `18 → 7`:
+  - panel has no certificate → bind it
+  - panel is bound to a self-signed certificate → replace it (self-signed is only for emergencies)
+  - panel is bound to another public certificate → leave it alone (18→3 asks first)
+- **Renewals adopt it too**: new `scripts/adopt-cert.sh`, wired into the acme reload command by
+  install.sh, so the 75-day renewal rebinds and restarts the panel automatically. Previously a renewal
+  only replaced files, which produced "certificate issued but the browser still warns".
+- After a successful 18→3 renewal the script also asks "restart the panel now? [Y/n]".
+
+Verified on a live server:
+
+```
+(1) panel bound to selfsigned → serves issuer=CN=us1.bbua.pp.ua (self-signed)
+(2) adopt-cert.sh us1.bbua.pp.ua
+    binding becomes /root/cert/us1.bbua.pp.ua/fullchain.pem
+    serves issuer=C=US, O=Let's Encrypt, CN=YE1
+(3) running it again (already public) → binding unchanged, service healthy
+```
+
+## Auto-bind after renewal (v1.4.10, 2026-11-01)
 
 - **Revoking a certificate no longer loops forever**: `18 → 2` used to call only `acme.sh --revoke`,
   leaving `/root/cert/<name>` in place, so the entry stayed in the list; for self-signed or wildcard
