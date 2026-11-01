@@ -32,6 +32,30 @@
 
 ---
 
+---
+
+## 卸载一并清理证书（v1.4.12，2026-11-01）
+
+- **`x-ui → 5` 卸载现在会处理证书**：列出 `/root/cert` 里本项目用过的证书目录，
+  确认后逐个删除、并在 CA 端撤销（Let's Encrypt 有记录时）；随后询问是否一并删除
+  `/root/.acme.sh`、`/etc/letsencrypt` 和 acme 续期 cron。全部同意后 `/root/cert` 空目录也会被删掉。
+- 仍保留一次确认（只回车 = 删除），避免误删你放在同一目录下、别的服务用的证书。
+- README 中英各补两条常见问题：**80 端口被 nginx 占用时先停 nginx 再签**、**卸载是否会删证书**。
+
+实测（真实服务器，卸载前后对比）：
+
+```
+卸载前 /root/cert: dummy-cert.example.com  selfsigned  us1.bbua.pp.ua
+执行 5 → 确认删除
+  已删除证书目录: /root/cert/dummy-cert.example.com
+  已在 CA 撤销: us1.bbua.pp.ua
+  已删除证书目录: /root/cert/us1.bbua.pp.ua
+  已删除证书目录: /root/cert/selfsigned
+  已删除 acme 状态、/etc/letsencrypt 与续期任务
+  已删除空的 /root/cert
+PASS: /root/cert 已删除 / PASS: /root/.acme.sh 已删除 / PASS: 程序目录已删除
+```
+
 ## 证书自动挂载（v1.4.11，2026-11-01）
 
 - **正式证书一签出来就自动挂到面板**，不用再手动 `18 → 7`：

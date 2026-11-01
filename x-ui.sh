@@ -320,10 +320,36 @@ uninstall() {
         left=$((left+1))
     fi
 
-    # 证书目录默认保留（里面可能有你其它服务的证书）
+    # ---- 证书：本项目签发/导入的证书一并处理（默认全部删除）----
     if [ -d /root/cert ] && [ -n "$(ls -A /root/cert 2>/dev/null)" ]; then
-        echo -e "  ${yellow}保留${plain}: /root/cert（证书，含 $(ls /root/cert | tr '\n' ' ')）"
-        echo "        确认不用了可手动删：rm -rf /root/cert"
+        echo ""
+        echo -e "${yellow}检测到本项目用过的证书：${plain}"
+        local cert_dirs
+        cert_dirs=$(find /root/cert -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null)
+        for d in $cert_dirs; do echo "    /root/cert/$d"; done
+        echo ""
+        read -rp "  一并删除这些证书（并在 CA 端撤销）？[Y/n]: " del_cert
+        if [[ -z "$del_cert" || "$del_cert" =~ ^[Yy] ]]; then
+            for d in $cert_dirs; do
+                if [ -x /root/.acme.sh/acme.sh ]; then
+                    /root/.acme.sh/acme.sh --revoke -d "$d" --ecc >/dev/null 2>&1 \
+                        && echo "  已在 CA 撤销: $d"
+                fi
+                rm -rf "/root/cert/$d" && echo "  已删除证书目录: /root/cert/$d"
+            done
+            rm -f /root/cert/.panel_domain
+            read -rp "  同时删除 acme 状态 (/root/.acme.sh) 和 /etc/letsencrypt？[Y/n]: " del_acme
+            if [[ -z "$del_acme" || "$del_acme" =~ ^[Yy] ]]; then
+                rm -rf /root/.acme.sh /etc/letsencrypt
+                crontab -l 2>/dev/null | grep -v "acme.sh" | crontab - 2>/dev/null || true
+                echo "  已删除 acme 状态、/etc/letsencrypt 与续期任务"
+            fi
+            rmdir /root/cert 2>/dev/null && echo "  已删除空的 /root/cert"
+            echo -e "${green}  证书已清理干净${plain}"
+        else
+            echo -e "${yellow}  保留 /root/cert（含 $(echo $cert_dirs | tr '\n' ' ')）${plain}"
+            echo "        确认不用了可手动删：rm -rf /root/cert"
+        fi
     fi
 
     echo ""

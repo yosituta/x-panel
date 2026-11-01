@@ -213,8 +213,9 @@ x-ui -v                   # version
 ## Uninstall
 
 **Normal uninstall** (`x-ui → 5`): stops the service, removes the binary, deletes the database in
-`/etc/x-ui`, removes the menu command and the firewall rule for the panel port. The certificate
-directory `/root/cert` is kept on purpose (it may hold certificates for other services).
+`/etc/x-ui`, removes the menu command and the firewall rule for the panel port. It then lists the
+certificates this project used under `/root/cert` and, after confirmation, **deletes them and revokes
+them at the CA**, and asks whether to remove `/root/.acme.sh`, `/etc/letsencrypt` and the renewal cron.
 
 **Full purge** (database, certificates, subscription system, acme state and logs included):
 
@@ -254,6 +255,28 @@ docs/                roadmap, analysis notes
 ```
 
 ## FAQ
+
+**Port 80 is held by nginx, so issuing or renewing a certificate keeps failing?**
+
+acme's standalone mode needs exclusive use of port 80. Stop nginx before issuing or renewing, start it
+again afterwards:
+
+```bash
+systemctl stop nginx     # before issuing/renewing (BaoTa users: stopping the panel is not enough)
+                          #   then x-ui → 18 → 1 (issue) or 18 → 3 (force renew)
+systemctl start nginx    # restore after the certificate is in place
+```
+
+The script now tries to stop nginx itself (systemd → `/etc/init.d/nginx` →
+`/www/server/nginx/sbin/nginx -s stop`). If it cannot, the operation is cancelled without touching your
+certificate and you are told to use `18 → 8` (Cloudflare DNS, no port 80 needed).
+
+**Are certificates removed when I uninstall?**
+
+Yes. `x-ui → 5` lists the certificates this project used under `/root/cert`, deletes them after
+confirmation and revokes them at the CA (when a Let's Encrypt record exists); it also asks whether to
+remove `/root/.acme.sh`, `/etc/letsencrypt` and the renewal cron. Use `scripts/purge.sh` to wipe
+everything including the database and the subscription system.
 
 **Reality nodes show a good ping but pages do not load.**
 If the server log says `REALITY: authentication failed`, the client's Reality implementation is incompatible with xray (observed with some Shadowrocket builds). Switch to the `auto` or `TLS` preset — this is not a server misconfiguration.

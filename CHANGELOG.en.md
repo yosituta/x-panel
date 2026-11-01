@@ -33,6 +33,33 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Uninstall removes certificates (v1.4.12, 2026-11-01)
+
+- **`x-ui → 5` now cleans up certificates**: it lists the certificate directories this project used
+  under `/root/cert`, deletes them after confirmation and revokes them at the CA (when a Let's Encrypt
+  record exists). It then asks whether to remove `/root/.acme.sh`, `/etc/letsencrypt` and the acme
+  renewal cron; if all are confirmed the now-empty `/root/cert` is removed as well.
+- One confirmation is kept (pressing Enter means yes) so certificates you keep for other services in
+  the same directory are not removed by accident.
+- README (both languages) gained two FAQ entries: **stop nginx before issuing/renewing when port 80 is
+  taken**, and **are certificates removed on uninstall**.
+
+Verified on a live server (before/after):
+
+```
+before: /root/cert = dummy-cert.example.com  selfsigned  us1.bbua.pp.ua
+run 5 → confirm
+  removed /root/cert/dummy-cert.example.com
+  revoked at CA: us1.bbua.pp.ua
+  removed /root/cert/us1.bbua.pp.ua
+  removed /root/cert/selfsigned
+  removed acme state, /etc/letsencrypt and the renewal cron
+  removed the now-empty /root/cert
+PASS: /root/cert gone / PASS: /root/.acme.sh gone / PASS: program directory gone
+```
+
 ## Automatic certificate adoption (v1.4.11, 2026-11-01)
 
 - **A newly issued public certificate is bound to the panel automatically** — no more manual `18 → 7`:

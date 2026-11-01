@@ -215,8 +215,9 @@ x-ui -v                   # 版本
 
 ## 卸载
 
-**普通卸载**（`x-ui → 5`）：停服务、删程序、删数据库 `/etc/x-ui`、删菜单命令、撤销面板端口防火墙规则。
-证书目录 `/root/cert` 会保留（里面可能有你其它服务的证书）。
+**普通卸载**（`x-ui → 5`）：停服务、删程序、删数据库 `/etc/x-ui`、删菜单命令、撤销面板端口防火墙规则；
+随后列出 `/root/cert` 里本项目用过的证书，**确认后逐个删除并在 CA 端撤销**，
+并询问是否一并删除 `/root/.acme.sh`、`/etc/letsencrypt` 与续期任务。
 
 **彻底卸载**（连数据库、证书、订阅系统、acme、日志一起删）：
 
@@ -256,6 +257,25 @@ docs/                路线图、分析笔记
 ```
 
 ## 常见问题
+
+**80 端口被 nginx 占着，证书申请/更新总是失败？**
+
+acme 的 standalone 模式必须独占 80 端口。申请或续期证书前先停掉 nginx，签完再启动：
+
+```bash
+systemctl stop nginx     # 申请/更新证书之前（宝塔用户：bt stop 之外还要停 nginx 本身）
+                          #   然后 x-ui → 18 → 1（获取）或 18 → 3（强制更新）
+systemctl start nginx    # 证书申请完成后恢复
+```
+
+脚本现在会自动尝试停 nginx（systemd → `/etc/init.d/nginx` → `/www/server/nginx/sbin/nginx -s stop`），
+停不掉会直接取消操作、不动你的证书，并提示改用 `18 → 8`（Cloudflare DNS 方式，不需要 80）。
+
+**卸载时证书会一起删掉吗？**
+
+会。`x-ui → 5` 卸载会列出 `/root/cert` 里本项目用过的证书，确认后逐个删除并在 CA 端撤销
+（Let's Encrypt 有记录时）；还会问你是否一并删除 `/root/.acme.sh`、`/etc/letsencrypt` 和续期任务。
+想连数据库、订阅系统全清干净可用 `scripts/purge.sh`。
 
 **Reality 节点测延迟正常但打不开网页？**
 服务端日志若出现 `REALITY: authentication failed`，是客户端 Reality 实现与服务端不兼容（实测部分 Shadowrocket 版本如此）。换 `自动` 或 `TLS` 预设即可，不属于服务端配置问题。
