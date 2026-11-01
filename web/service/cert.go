@@ -281,3 +281,28 @@ func isPublicCA(cert *x509.Certificate) bool {
 	}
 	return false
 }
+
+// IsTrustedByBrowser 当前绑定的面板证书是否被浏览器默认信任
+// 只有公共 CA（Let's Encrypt / ZeroSSL / 商业 CA）且不是 Cloudflare 源站证书才算。
+func (s *CertService) IsTrustedByBrowser() bool {
+	var ss SettingService
+	f, _ := ss.GetCertFile()
+	if f == "" {
+		return false
+	}
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return false
+	}
+	cert, err := parseFirstCert(data)
+	if err != nil {
+		return false
+	}
+	if isCfOriginCert(cert) {
+		return false
+	}
+	if cert.Issuer.String() == cert.Subject.String() {
+		return false // 自签
+	}
+	return isPublicCA(cert)
+}

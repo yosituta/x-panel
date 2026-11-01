@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"x-ui/config"
@@ -249,6 +250,22 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	})
 	// 【开源增强】HTTPS 页面下发 HSTS：域名访问时，浏览器以后即使输入 http:// 也会自己升级到 https://
 	// IP 访问不加（HSTS 规范不允许用于 IP，加了也会被忽略）
+	//
+	// 【重要】只有「浏览器默认信任的证书」（公共 CA）才下发 HSTS。
+	// 否则会把自己锁死：自签/CF 源站证书 + HSTS = Chrome 直接 ERR_CERT_AUTHORITY_INVALID 且
+	// 不给"继续访问"按钮，用户连面板都进不去（本文件的 v1.2.0 就踩过这个坑）。
+	var hstsTrusted atomic.Bool
+	var hstsCheckedAt atomic.Int64
+	refreshHSTS := func() {
+		now := time.Now().Unix()
+		last := hstsCheckedAt.Load()
+		if last != 0 && now-last < 60 {
+			return
+		}
+		cs := service.CertService{}
+		hstsTrusted.Store(cs.IsTrustedByBrowser())
+		hstsCheckedAt.Store(now)
+	}
 	engine.Use(func(c *gin.Context) {
 		if c.Request.TLS != nil {
 			host := c.Request.Host
@@ -256,7 +273,11 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 				host = h
 			}
 			if net.ParseIP(host) == nil && host != "" {
-				c.Header("Strict-Transport-Security", "max-age=31536000")
+				refreshHSTS()
+				if hstsTrusted.Load() {
+					// 30 天足够，证书出问题时也不会把人锁死一整年
+					c.Header("Strict-Transport-Security", "max-age=2592000")
+				}
 			}
 		}
 		c.Next()
