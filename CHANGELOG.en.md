@@ -43,6 +43,34 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## HSTS only for trusted certificates + firewall on port change (v1.4.17, 2026-11-01)
+
+**Incident**: the user changed the panel port to 1999 and the base path to `/vpn/`; after restarting,
+the panel was unreachable and Chrome reported `ERR_CERT_AUTHORITY_INVALID` with the note that the site
+uses HSTS.
+
+Three failures compounded:
+
+- **HSTS versus self-signed certificates**: HSTS was sent unconditionally since v1.2.0. Once a browser
+  has pinned HSTS, an untrusted certificate gets no "proceed anyway" option at all, locking the owner
+  out of the panel. HSTS is now only sent when the certificate is publicly trusted (public CA, not a
+  Cloudflare Origin certificate, not self-signed), and `max-age` dropped from one year to 30 days.
+- **Changing the port did not open the firewall**: the panel wrote the setting but never ran
+  `ufw allow`, so the new port was unreachable from outside. Saving settings now opens the new port.
+- **The post-restart redirect ignored the port**: the frontend only used `webBasePath`, so the browser
+  stayed on the old port, showed a timeout, and the change looked like it had not applied. It now
+  navigates to "new port + new path".
+
+Verified on a live server:
+
+```
+LE certificate   → Strict-Transport-Security: max-age=2592000
+self-signed      → no HSTS
+restored LE      → HSTS again
+```
+
 ## Certificate flow fixes: acme leftovers, 429, uninstall backup (v1.4.16, 2026-11-01)
 
 All three touch the "uninstall → reinstall" path:
