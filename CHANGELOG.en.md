@@ -8,6 +8,39 @@ Baseline: upstream `main` (pulled 2026-10). The panel version string still follo
 
 ---
 
+## Certificate revoke & renewal fixes (v1.4.9, 2026-11-01)
+
+- **Revoking a certificate no longer loops forever**: `18 → 2` used to call only `acme.sh --revoke`,
+  leaving `/root/cert/<name>` in place, so the entry stayed in the list; for self-signed or wildcard
+  certificates acme also printed `is not an issued domain, skipping`. Revoking now revokes at the CA if
+  a record exists, **deletes the local certificate directory**, unbinds it if the panel is using it and
+  clears `/root/cert/.panel_domain` when it matches.
+- **`18 → 6` lists every certificate distinctly**: all three used to render as `hk.bbua.pp.ua` (each
+  resolved through the recorded domain), which made them indistinguishable. It now prints
+  `目录：bbua.pp.ua → 证书域名：*.bbua.pp.ua ← 当前面板在用`, and the name to type when revoking or
+  renewing is the **directory name**.
+- **Renew/issue now handles port 80 automatically**: previously only `systemctl stop nginx` was tried, so
+  BaoTa's nginx blocked issuance. One shared helper now tries systemd → `/etc/init.d/nginx` →
+  `/www/server/nginx/sbin/nginx -s stop`; if it is still busy the operation is cancelled with a clear
+  hint (`bt stop`, or use 18→8 Cloudflare DNS) and **the certificate is left untouched**. After a
+  successful renewal the files are re-installed into `/root/cert/<dir>` and nginx is restored.
+
+Verified on a live server:
+
+```
+18→2 revoke del-test.example.com
+  no CA record (normal for self-signed/wildcard), local only
+  removed /root/cert/del-test.example.com
+  PASS: directory gone, entry no longer listed
+
+18→3 renew with port 80 held by python3
+  80 still busy: users:(("python3",pid=981518))
+  cannot free port 80, renewal cancelled (certificate untouched)
+
+18→3 renew with port 80 free
+  notBefore: Oct 31 18:18:47 → Nov 1 02:05:03   (real renewal)
+```
+
 ## Full purge script (v1.4.8, 2026-11-01)
 
 - New `scripts/purge.sh`: one command that wipes the panel, database, certificates, subscription

@@ -436,6 +436,34 @@ panel_cert_host() {
     echo "$host"
 }
 
+# ---- 80 端口占用处理（acme standalone 必须独占 80）----
+panel_port80_busy() { ss -tln 2>/dev/null | grep -qE ':80[[:space:]]'; }
+
+# 尝试腾出 80：宝塔/系统 nginx 都可能占着，逐个方式停一次
+panel_free_port80() {
+    panel_port80_busy || return 0
+    echo "  80 端口被占用，尝试临时停止 nginx..."
+    systemctl stop nginx >/dev/null 2>&1
+    if panel_port80_busy && [ -x /etc/init.d/nginx ]; then
+        /etc/init.d/nginx stop >/dev/null 2>&1
+    fi
+    if panel_port80_busy && [ -x /www/server/nginx/sbin/nginx ]; then
+        /www/server/nginx/sbin/nginx -s stop >/dev/null 2>&1
+    fi
+    sleep 3
+    if panel_port80_busy; then
+        echo -e "${yellow}  80 端口仍被占用：${plain}$(ss -tlnp 2>/dev/null | grep -E ':80[[:space:]]' | head -1)"
+        echo "    若为宝塔：先执行 bt stop（只停面板不够），或 x-ui → 18 → 8 用 Cloudflare DNS 方式（不需要 80）"
+        return 1
+    fi
+    echo "  80 端口已腾出"
+    return 0
+}
+
+panel_restore_nginx() {
+    systemctl start nginx >/dev/null 2>&1 && echo "  已恢复 nginx"
+}
+
 # 是否自签证书（issuer == subject 说明是自签）
 panel_cert_is_selfsigned() {
     local cert="$1" iss sub
@@ -1123,15 +1151,21 @@ ssl_cert_issue_standalone_embedded() {
 
     # --- 6. 申请证书 (Standalone 模式) ---
     LOGI "正在使用 Standalone 模式申请证书 (占用 80 端口)..."
-    # 如果 80 端口被 nginx 或 x-ui 占用，先尝试停止它们
-    systemctl stop nginx >/dev/null 2>&1
-    systemctl stop "${SERVICE_NAME}" >/dev/null 2>&1
+    # 80 端口：nginx（含宝塔）常驻占用，用统一的助手函数腾出来
+    local was_busy=0
+    panel_port80_busy && was_busy=1
+    if ! panel_free_port80; then
+        LOGE "❌ 80 端口无法释放，已取消申请（面板未改动）"
+        LOGE "  宝塔用户：先 bt stop；或改用 x-ui → 18 → 8（Cloudflare DNS，不需要 80）"
+        return 1
+    fi
     
     if ! ~/.acme.sh/acme.sh --issue --standalone -d $DOMAIN --server $CA_SERVER --days 75 --force; then
         LOGE "❌ 证书申请失败！"
         LOGE "请检查：1、域名解析是否正确指向本机 IP。2、80 端口是否开放且未被占用。"
-        # 失败尝试重启 x-ui
+        # 失败尝试重启 x-ui / 恢复 nginx
         systemctl start "${SERVICE_NAME}" >/dev/null 2>&1
+        [[ "$was_busy" == "1" ]] && panel_restore_nginx
         return 1
     fi
 
@@ -1277,35 +1311,80 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     2) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null) 
         if [ -z "$domains" ]; then 
             echo "未找到可撤销的证书。" 
         else 
-            echo "现有域名：" 
+            echo "现有证书目录：" 
             echo "$domains" 
-            read -rp "请从列表中输入要撤销证书的域名：" domain 
-            if echo "$domains" | grep -qw "$domain"; then 
-                ~/.acme.sh/acme.sh --revoke -d ${domain} 
-                LOGI "已撤销域名的证书：$domain" 
+            echo ""
+            echo "（输入目录名，例如 selfsigned / hk.bbua.pp.ua / bbua.pp.ua）"
+            read -rp "请从列表中输入要撤销证书的目录名：" domain 
+            if echo "$domains" | grep -qx "$domain"; then 
+                local cdir="/root/cert/${domain}"
+                local ccert="${cdir}/fullchain.pem"
+                # 1) CA 上有签发记录就撤销；没有也继续（本地照样要删）
+                if ~/.acme.sh/acme.sh --revoke -d "$domain" --ecc >/dev/null 2>&1; then
+                    echo -e "${green}  已在 CA 撤销：$domain${plain}"
+                else
+                    echo -e "${yellow}  CA 上没有该域名的签发记录（自签/通配证书属于正常），只删本地${plain}"
+                fi
+                # 2) 关键修复：删掉本地目录，否则列表里永远还在（死循环）
+                rm -rf "$cdir" && echo "  已删除本地证书目录：$cdir"
+                # 3) 面板正绑着它 → 解绑，避免指向不存在的文件
+                local cur_cert
+                cur_cert=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
+                if [[ -n "$cur_cert" && "$cur_cert" == ${cdir}/* ]]; then
+                    /usr/local/x-ui/x-ui cert -webCert "" -webCertKey "" >/dev/null 2>&1 \
+                        && echo -e "${green}  面板已解绑该证书${plain}"
+                    echo -e "${yellow}  需要重启面板才生效：x-ui → 13${plain}"
+                fi
+                # 4) 清掉记录的域名
+                if [[ -f /root/cert/.panel_domain ]] && [[ "$(tr -d '[:space:]' < /root/cert/.panel_domain)" == "$domain" ]]; then
+                    rm -f /root/cert/.panel_domain && echo "  已清除记录的域名：$domain"
+                fi
+                echo ""
+                echo -e "${green}撤销完成。${plain}"
             else 
-                echo "输入的域名无效。" 
+                echo "输入的目录名无效。" 
             fi 
         fi 
         ssl_cert_issue_main 
         ;; 
     3) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \;) 
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null) 
         if [ -z "$domains" ]; then 
             echo "未找到可更新的证书。" 
         else 
-            echo "现有域名：" 
+            echo "现有证书目录：" 
             echo "$domains" 
-            read -rp "请从列表中输入要强制更新 SSL 证书的域名：" domain 
-            if echo "$domains" | grep -qw "$domain"; then 
-                ~/.acme.sh/acme.sh --renew -d ${domain} --force 
-                LOGI "已强制更新域名的证书：$domain" 
+            read -rp "请从列表中输入要强制更新 SSL 证书的目录名：" domain 
+            if echo "$domains" | grep -qx "$domain"; then 
+                local was_busy=0
+                panel_port80_busy && was_busy=1
+                if ! panel_free_port80; then
+                    echo -e "${red}  无法释放 80 端口，本次更新已取消（证书未改动）${plain}"
+                    ssl_cert_issue_main
+                    return 0
+                fi
+                if ~/.acme.sh/acme.sh --renew -d "$domain" --force; then
+                    # 续期后重新下发到 /root/cert/<目录>
+                    ~/.acme.sh/acme.sh --install-cert -d "$domain" --ecc \
+                        --key-file "/root/cert/${domain}/privkey.pem" \
+                        --fullchain-file "/root/cert/${domain}/fullchain.pem" >/dev/null 2>&1
+                    LOGI "已强制更新域名的证书：$domain"
+                    # 若面板正绑着它，重启后生效
+                    local cur_cert2
+                    cur_cert2=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
+                    if [[ -n "$cur_cert2" && "$cur_cert2" == /root/cert/${domain}/* ]]; then
+                        echo -e "${yellow}  面板当前就用这张证书，重启面板后生效：x-ui → 13${plain}"
+                    fi
+                else
+                    echo -e "${red}  更新失败，见上方 acme 输出${plain}"
+                fi
+                [[ "$was_busy" == "1" ]] && panel_restore_nginx
             else 
-                echo "输入的域名无效。" 
+                echo "输入的目录名无效。" 
             fi 
         fi 
         ssl_cert_issue_main 
@@ -1389,17 +1468,21 @@ ssl_cert_issue_main() {
         if [ -z "$domains" ]; then 
             echo "未找到证书。" 
         else 
-            echo "现有域名及其路径：" 
+            local cur_cert_now
+            cur_cert_now=$(/usr/local/x-ui/x-ui setting -getCert true 2>/dev/null | grep -Eo 'cert: .+' | awk '{print $2}')
+            echo "现有证书（目录名 = 撤销/更新时输入的名字）：" 
             for domain in $domains; do 
                 local cert_path="/root/cert/${domain}/fullchain.pem" 
                 local key_path="/root/cert/${domain}/privkey.pem" 
                 if [[ -f "${cert_path}" && -f "${key_path}" ]]; then
                     local real_host
                     real_host=$(panel_cert_host "${cert_path}")
+                    local binding=""
+                    [[ -n "$cur_cert_now" && "$cur_cert_now" == /root/cert/${domain}/* ]] && binding=" ${green}← 当前面板在用${plain}"
                     if panel_cert_is_selfsigned "${cert_path}"; then
-                        echo -e "域名：${real_host} ${yellow}（自签证书，仅用于应急访问）${plain}"
+                        echo -e "目录：${domain}  →  证书域名：${real_host} ${yellow}（自签，仅应急）${plain}${binding}"
                     else
-                        echo -e "域名：${real_host:-$domain}"
+                        echo -e "目录：${domain}  →  证书域名：${real_host:-$domain}${binding}"
                     fi
                     echo "" 
                     echo -e "\t证书路径：${cert_path}"
