@@ -386,7 +386,7 @@
                     <!-- ===== CDN 域名 ===== -->
                     <a-card size="small" title="CDN 域名" style="margin-bottom: 12px">
                       <template #extra>
-                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v12</span>
+                        <span style="font-size: 12px; opacity: .65">仅 TLS 系节点（预设 3）可用 · UI v13</span>
                       </template>
 
                       <a-form :label-col="{ span: 3 }" :wrapper-col="{ span: 20 }" :colon="false">
@@ -736,7 +736,7 @@
         this.loadingStates.spinning = spinning;
       },
       async getAllSetting() {
-        const msg = await HttpUtil.post("/panel/setting/all");
+        const msg = await HttpUtil.post('/panel/setting/all');
 
         if (msg.success) {
           if (!this.loadingStates.fetched) {
@@ -751,7 +751,7 @@
       },
       async updateAllSetting() {
         this.loading(true);
-        const msg = await HttpUtil.post("/panel/setting/update", this.allSetting);
+        const msg = await HttpUtil.post('/panel/setting/update', this.allSetting);
         this.loading(false);
         if (msg.success) {
           await this.getAllSetting();
@@ -760,7 +760,7 @@
       async updateUser() {
         const sendUpdateUserRequest = async () => {
           this.loading(true);
-          const msg = await HttpUtil.post("/panel/setting/updateUser", this.user);
+          const msg = await HttpUtil.post('/panel/setting/updateUser', this.user);
           this.loading(false);
           if (msg.success) {
             this.user = {};
@@ -846,32 +846,37 @@
           content: '重启期间面板会断开约 3 秒，页面会自动重连，确定现在重启吗？'
         });
         if (!ok) return;
+        // 保存时可能改了访问路径，重启后要跳到新路径，不能还停在旧地址上
+        let newBase = (this.allSetting && this.allSetting.webBasePath) || '/';
+        if (!newBase.startsWith('/')) newBase = '/' + newBase;
+        if (!newBase.endsWith('/')) newBase += '/';
+
         this.panelRestarting = true;
         this.$message.loading('正在重启面板…', 0);
         try {
           // 重启会让当前连接中断，请求报错是正常的（服务在重启中）
-          await HttpUtil.post('/panel/api/setting/restartPanel', {});
+          await HttpUtil.post('/panel/setting/restartPanel', {});
         } catch (e) {
           // 忽略：服务已经在下线
         }
-        // 轮询公开探针，服务回来后自动刷新页面
+        // 轮询公开探针（不带登录态），服务回来后跳到「当前设置的路径」
         let tries = 0;
         const timer = setInterval(async () => {
           tries++;
           try {
-            const res = await fetch('/panel/api/uiinfo', { cache: 'no-store' });
+            const res = await fetch(newBase + 'panel/api/uiinfo', { cache: 'no-store' });
             if (res.ok) {
               clearInterval(timer);
               this.$message.destroy();
-              this.$message.success('面板已重启，正在刷新…');
-              setTimeout(() => window.location.reload(), 800);
+              this.$message.success('面板已重启，正在打开新地址：' + newBase);
+              setTimeout(() => { window.location.href = newBase + 'panel/settings'; }, 800);
               return;
             }
           } catch (e) { /* 还没起来 */ }
           if (tries > 30) {
             clearInterval(timer);
             this.$message.destroy();
-            this.$message.error('重启超时，请手动刷新页面或执行 x-ui → 14 检查状态');
+            this.$message.error('重启超时，请手动打开：' + newBase + 'panel/settings（或 x-ui → 14 检查状态）');
             this.panelRestarting = false;
           }
         }, 2000);
