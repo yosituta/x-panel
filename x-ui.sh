@@ -330,6 +330,13 @@ uninstall() {
         echo ""
         read -rp "  一并删除这些证书（并在 CA 端撤销）？[Y/n]: " del_cert
         if [[ -z "$del_cert" || "$del_cert" =~ ^[Yy] ]]; then
+            # 先备份：Let's Encrypt 有频率限制（429），重装时重新签发可能失败，
+            # 留着备份就能直接恢复，不用再走申请流程
+            local bdir="/root/cert-backup-$(date +%Y%m%d-%H%M%S)"
+            if cp -a /root/cert "$bdir" 2>/dev/null; then
+                echo -e "${green}  已先备份证书到：$bdir${plain}"
+                echo "        （重装时可从这里恢复，避免重新申请撞上 CA 频率限制）"
+            fi
             for d in $cert_dirs; do
                 if [ -x /root/.acme.sh/acme.sh ]; then
                     /root/.acme.sh/acme.sh --revoke -d "$d" --ecc >/dev/null 2>&1 \
@@ -1372,23 +1379,35 @@ ssl_cert_issue_main() {
         ssl_cert_issue_main 
         ;; 
     2) 
-        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null) 
-        if [ -z "$domains" ]; then 
+        local domains=$(find /root/cert/ -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null)
+        # acme 里可能还有记录（本地目录已删/从未安装到 /root/cert），一并列出
+        local acme_domains=""
+        if [ -x /root/.acme.sh/acme.sh ]; then
+            acme_domains=$(/root/.acme.sh/acme.sh --list 2>/dev/null | awk 'NR>1 && $1!="" {print $1}' | grep -v '^Main_Domain$')
+        fi
+        local all_domains=$(printf "%s\n%s\n" "$domains" "$acme_domains" | grep -v '^$' | sort -u)
+        if [ -z "$all_domains" ]; then 
             echo "未找到可撤销的证书。" 
         else 
-            echo "现有证书目录：" 
-            echo "$domains" 
+            echo "现有证书（本地目录 + acme 记录）：" 
+            echo "$all_domains" 
             echo ""
-            echo "（输入目录名，例如 selfsigned / hk.bbua.pp.ua / bbua.pp.ua）"
-            read -rp "请从列表中输入要撤销证书的目录名：" domain 
-            if echo "$domains" | grep -qx "$domain"; then 
+            echo "（输入域名/目录名，例如 selfsigned / hk.bbua.pp.ua / bbua.pp.ua）"
+            read -rp "请从列表中输入要撤销的域名：" domain 
+            if echo "$all_domains" | grep -qx "$domain"; then 
                 local cdir="/root/cert/${domain}"
                 local ccert="${cdir}/fullchain.pem"
                 # 1) CA 上有签发记录就撤销；没有也继续（本地照样要删）
-                if ~/.acme.sh/acme.sh --revoke -d "$domain" --ecc >/dev/null 2>&1; then
-                    echo -e "${green}  已在 CA 撤销：$domain${plain}"
-                else
-                    echo -e "${yellow}  CA 上没有该域名的签发记录（自签/通配证书属于正常），只删本地${plain}"
+                if [ -x /root/.acme.sh/acme.sh ]; then
+                    if /root/.acme.sh/acme.sh --revoke -d "$domain" --ecc >/dev/null 2>&1; then
+                        echo -e "${green}  已在 CA 撤销：$domain${plain}"
+                    else
+                        echo -e "${yellow}  CA 上没有该域名的签发记录（自签/通配/已撤销过，属正常）${plain}"
+                    fi
+                    # 关键：删掉 acme 里的记录，否则 18→1 会一直提示"已存在此域名的证书"
+                    if /root/.acme.sh/acme.sh --remove -d "$domain" --ecc >/dev/null 2>&1; then
+                        echo "  已从 acme 目录移除：$domain"
+                    fi
                 fi
                 # 2) 关键修复：删掉本地目录，否则列表里永远还在（死循环）
                 rm -rf "$cdir" && echo "  已删除本地证书目录：$cdir"
@@ -1420,6 +1439,17 @@ ssl_cert_issue_main() {
             echo "现有证书目录：" 
             echo "$domains" 
             read -rp "请从列表中输入要强制更新 SSL 证书的目录名：" domain 
+            # 本地目录没有但 acme 里有：先补装一次，再继续续期
+            if ! echo "$domains" | grep -qx "$domain" && [ -x /root/.acme.sh/acme.sh ] \
+               && /root/.acme.sh/acme.sh --list 2>/dev/null | awk '{print $1}' | grep -qx "$domain"; then
+                mkdir -p "/root/cert/${domain}"
+                /root/.acme.sh/acme.sh --install-cert -d "$domain" --ecc \
+                    --key-file "/root/cert/${domain}/privkey.pem" \
+                    --fullchain-file "/root/cert/${domain}/fullchain.pem" >/dev/null 2>&1 \
+                    && echo "  已从 acme 目录补装证书到 /root/cert/${domain}"
+                domains="$domains $(echo)"
+                domains=$(printf "%s\n%s\n" "$domains" "$domain" | grep -v '^$' | sort -u)
+            fi
             if echo "$domains" | grep -qx "$domain"; then 
                 local was_busy=0
                 panel_port80_busy && was_busy=1
@@ -1707,13 +1737,30 @@ ssl_cert_issue() {
     LOGI "域名解析验证成功，继续执行证书申请......"
     echo ""
 
-    # 检查是否已存在证书
-    local currentCert=$(~/.acme.sh/acme.sh --list | tail -1 | awk '{print $1}')
-    if [ "${currentCert}" == "${domain}" ]; then
-        local certInfo=$(~/.acme.sh/acme.sh --list)
-        LOGE "系统已存在此域名的证书。无法再次签发。当前证书详情:"
-        LOGI "$certInfo"
-        exit 1
+    # 已存在该域名的证书 → 直接安装到面板即可（重新签发会撞 Let's Encrypt 频率限制 429）
+    if ~/.acme.sh/acme.sh --list 2>/dev/null | awk '{print $1}' | grep -qx "$domain"; then
+        echo ""
+        LOGE "系统里已有该域名的证书（acme 目录里），不需要重新签发。"
+        ~/.acme.sh/acme.sh --list 2>/dev/null | sed 's/^/    /'
+        echo ""
+        if [[ -d "$HOME/.acme.sh/${domain}_ecc" || -d "/root/.acme.sh/${domain}_ecc" ]]; then
+            local certPath="/root/cert/${domain}"
+            mkdir -p "$certPath"
+            ~/.acme.sh/acme.sh --install-cert -d "$domain" --ecc \
+                --key-file "${certPath}/privkey.pem" \
+                --fullchain-file "${certPath}/fullchain.pem" >/dev/null 2>&1
+            if [[ -s "${certPath}/fullchain.pem" ]]; then
+                /usr/local/x-ui/x-ui cert -webCert "${certPath}/fullchain.pem" \
+                                          -webCertKey "${certPath}/privkey.pem" >/dev/null 2>&1
+                echo -e "${green}已把现有证书安装并绑定到面板：${certPath}${plain}"
+                echo -e "${yellow}重启面板后生效：x-ui → 13${plain}"
+                ssl_cert_issue_main
+                return 0
+            fi
+        fi
+        echo -e "${yellow}现有证书无法安装（文件不完整）。可先 18 → 2 撤销该域名，再重新申请。${plain}"
+        ssl_cert_issue_main
+        return 0
     else
         LOGI "您的域名现在可以签发证书了......"
     fi

@@ -41,6 +41,36 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Certificate flow fixes: acme leftovers, 429, uninstall backup (v1.4.16, 2026-11-01)
+
+All three touch the "uninstall → reinstall" path:
+
+- **`18 → 1` no longer re-issues blindly**: it used to look at the last row of `acme.sh --list` and
+  `exit 1`, effectively locking the existing certificate away. Now, when the domain already has a
+  certificate in acme, it **installs it into `/root/cert/<domain>` and binds it to the panel** without
+  contacting the CA at all — so it cannot hit Let's Encrypt's 429 rate limit.
+- **`18 → 2` now clears the acme record too**: the list used to scan only `/root/cert`, leaving acme
+  entries that could never be removed ("cannot revoke, yet says it already exists" loop). The list is
+  now local directories + acme entries, and revoking runs `--revoke` followed by `--remove`.
+- **`18 → 3` handles "directory gone but acme still has it"** by running `--install-cert` first.
+- **Uninstall backs certificates up** to `/root/cert-backup-<timestamp>/` before deleting and revoking;
+  **the installer restores the newest backup when issuance fails (including 429)** instead of falling
+  back to self-signed.
+- 429 is explained explicitly: too many issuances for the same domain within 7 days — wait for the
+  window, reuse a backup, or switch to the DNS method (`18 → 19`).
+
+Verified on a live server:
+
+```
+scenario: /root/cert/us1.bbua.pp.ua deleted while acme still has the record
+18 → 2 list: us1.bbua.pp.ua (from acme)
+after install-cert + cert -webCert:
+  binding = /root/cert/us1.bbua.pp.ua/fullchain.pem
+  issuer  = C=US, O=Let's Encrypt, CN=YE2   (no re-issue, hence no 429)
+```
+
 ## Settings tabs unclickable fixed (v1.4.15, 2026-11-01)
 
 - **Root cause**: the card added in v1.4.14 made the backend serialise `channels` as `null` when unset;

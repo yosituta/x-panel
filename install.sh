@@ -282,6 +282,25 @@ auto_install() {
             echo -e "${yellow}  证书申请失败，日志：/tmp/xp-acme.log${plain}"
             echo -e "${yellow}  常见原因：域名未解析到本机 / 80 端口被占用或被墙 / Cloudflare 开了橙云${plain}"
             tail -4 /tmp/xp-acme.log 2>/dev/null | sed 's/^/    /'
+            # 之前卸载时备份过证书 → 直接恢复，避免被 Let's Encrypt 频率限制（429）卡住
+            local bk
+            bk=$(ls -d /root/cert-backup-* 2>/dev/null | sort -r | head -1)
+            if [[ -n "$bk" && -s "$bk/${A_DOMAIN}/fullchain.pem" ]]; then
+                mkdir -p "/root/cert/${A_DOMAIN}"
+                cp -f "$bk/${A_DOMAIN}/"* "/root/cert/${A_DOMAIN}/" 2>/dev/null
+                if [[ -s "/root/cert/${A_DOMAIN}/fullchain.pem" ]]; then
+                    ./x-ui cert -webCert "/root/cert/${A_DOMAIN}/fullchain.pem" \
+                                -webCertKey "/root/cert/${A_DOMAIN}/privkey.pem" >/dev/null 2>&1
+                    cert_done=1
+                    echo -e "${green}  已从备份恢复证书：${bk}/${A_DOMAIN}${plain}"
+                    echo -e "${yellow}  注意：证书不会自动续期，请等 CA 频率限制解除后再 x-ui → 18 → 3 续签${plain}"
+                fi
+            fi
+            if grep -q '"status": 429' /tmp/xp-acme.log 2>/dev/null; then
+                echo -e "${red}  Let's Encrypt 频率限制（429）：同一域名 7 天内签发次数过多${plain}"
+                echo "    · 可以等限制窗口过去（通常 3-7 天），或用已有证书（见上）"
+                echo "    · 也可以 x-ui → 19 用 Cloudflare DNS 方式换一条申请路径"
+            fi
         fi
     fi
 
