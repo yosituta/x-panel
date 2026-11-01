@@ -35,6 +35,31 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## "Saved access path does not take effect" fixed (v1.4.13, 2026-11-01)
+
+- **Root cause**: the restart button in the settings page posted to
+  `/panel/api/setting/restartPanel`, but the real route is `{basePath}panel/setting/restartPanel`
+  (there is no `/api` segment there). The restart therefore returned 404, the panel never restarted,
+  and the new path only reached the database while the process kept serving the old one.
+- **Fixes**:
+  - restart endpoint corrected to `/panel/setting/restartPanel`
+  - after the restart the page navigates to the currently configured base path, so changing the path
+    lands you on the new URL instead of the stale one
+  - the `/panel/api/uiinfo` probe bypasses axios's baseURL, so it now prefixes basePath itself
+
+Verified on a live server:
+
+```
+after switching to /xp-test and restarting:
+  old /panel/api/uiinfo          → 404
+  new /xp-test/panel/api/uiinfo  → 200
+  restart endpoint (new path)    → 307 (route exists, login required)
+  login page /xp-test/           → 200
+back on /: /panel/api/uiinfo     → 200
+```
+
 ## Uninstall removes certificates (v1.4.12, 2026-11-01)
 
 - **`x-ui → 5` now cleans up certificates**: it lists the certificate directories this project used

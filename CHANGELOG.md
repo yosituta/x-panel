@@ -34,6 +34,28 @@
 
 ---
 
+---
+
+## 修复「改访问路径保存了却不生效」（v1.4.13，2026-11-01）
+
+- **根因**：面板设置页的重启按钮调用的是 `/panel/api/setting/restartPanel`，
+  而真实路由是 `{basePath}panel/setting/restartPanel`（`/api` 那段根本不存在）。
+  所以点「重启面板」实际是 404，面板没重启 → 新路径只写进了数据库，进程仍用旧路径。
+- **修复**：
+  - 重启接口改为 `/panel/setting/restartPanel`
+  - 重启后自动跳转到「当前设置的访问路径」（改了路径也能自动落到新地址，不再停在旧 URL）
+  - 轮询用的 `/panel/api/uiinfo` 不走 axios 的 baseURL，改为自己拼 basePath
+- 实测（真实服务器）：
+
+```
+改成 /xp-test 并重启后：
+  旧路径 /panel/api/uiinfo          → 404
+  新路径 /xp-test/panel/api/uiinfo  → 200
+  重启接口（新路径）                → 307（路由存在，需登录）
+  登录页 /xp-test/                  → 200
+恢复成 / 之后：/panel/api/uiinfo    → 200
+```
+
 ## 卸载一并清理证书（v1.4.12，2026-11-01）
 
 - **`x-ui → 5` 卸载现在会处理证书**：列出 `/root/cert` 里本项目用过的证书目录，
