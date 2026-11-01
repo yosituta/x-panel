@@ -57,7 +57,11 @@ const (
 
 func (s *CertNotifyService) Load() CertNotifyConfig {
 	var ss SettingService
-	cfg := CertNotifyConfig{NtfyServer: "https://ntfy.sh", Days: []int{15, 7, 3}}
+	cfg := CertNotifyConfig{
+		NtfyServer: "https://ntfy.sh",
+		Days:       []int{15, 7, 3},
+		Channels:   []string{}, // 必须是空切片而不是 nil：JSON 里 null 会让前端 .includes 抛错
+	}
 	if v, err := ss.getString(keyNotifyEnable); err == nil {
 		cfg.Enable = v == "true" || v == "1"
 	}
@@ -120,7 +124,16 @@ func (s *CertNotifyService) Save(cfg CertNotifyConfig) error {
 
 func (s *CertNotifyService) Status() (*CertNotifyStatus, error) {
 	cfg := s.Load()
+	if cfg.Channels == nil {
+		cfg.Channels = []string{}
+	}
+	if cfg.Days == nil {
+		cfg.Days = []int{15, 7, 3}
+	}
 	out := &CertNotifyStatus{Config: cfg, LastSent: s.loadState()}
+	if out.LastSent == nil {
+		out.LastSent = map[string]string{}
+	}
 	var cs CertService
 	info, err := cs.Status()
 	if err != nil {

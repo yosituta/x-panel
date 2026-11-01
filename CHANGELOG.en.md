@@ -39,6 +39,17 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Settings tabs unclickable fixed (v1.4.15, 2026-11-01)
+
+- **Root cause**: the card added in v1.4.14 made the backend serialise `channels` as `null` when unset;
+  the template called `.includes()` on `null`, which throws a TypeError, aborts Vue's render and leaves
+  every later interaction (including tab switching) dead.
+- **Fix**: the backend now always returns empty arrays/objects (never nil), and `loadCertNotify`
+  normalises the payload and swallows errors so a failing endpoint cannot break the whole page.
+- Lesson: a Go nil slice must be explicitly initialised before it reaches a Vue template.
+
 ## Certificate expiry reminders (v1.4.14, 2026-11-01)
 
 Context: acme standalone renewals need exclusive use of port 80, which nginx/BaoTa often occupies, so

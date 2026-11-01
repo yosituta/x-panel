@@ -433,7 +433,7 @@
                     <a-card size="small" title="证书到期提醒" style="margin-top: 12px">
                       <template #extra>
                         <span style="font-size: 12px; opacity: .65">
-                          到期前按设定的天数推送，渠道可多选 · UI v14
+                          到期前按设定的天数推送，渠道可多选 · UI v15
                         </span>
                       </template>
 
@@ -469,7 +469,7 @@
                           </span>
                         </a-form-item>
 
-                        <template v-if="certNotify.config.channels.includes('ntfy')">
+                        <template v-if="(certNotify.config.channels || []).includes('ntfy')">
                           <a-form-item label="ntfy 地址">
                             <a-input v-model="certNotify.config.ntfyServer" style="max-width: 320px"
                                      placeholder="https://ntfy.sh"></a-input>
@@ -483,7 +483,7 @@
                           </a-form-item>
                         </template>
 
-                        <a-form-item v-if="certNotify.config.channels.includes('webhook')" label="Webhook">
+                        <a-form-item v-if="(certNotify.config.channels || []).includes('webhook')" label="Webhook">
                           <a-input v-model="certNotify.config.webhookUrl" style="max-width: 520px"
                                    placeholder="https://example.com/hook"></a-input>
                           <div style="margin-top: 4px; font-size: 12px; opacity: .6">
@@ -969,10 +969,30 @@
         }, 2000);
       },
       async loadCertNotify() {
-        const msg = await HttpUtil.post('/panel/api/certnotify/status', {});
-        if (msg.success && msg.obj) {
-          this.certNotify = msg.obj;
-          this.certNotifyDaysText = (msg.obj.config && msg.obj.config.days || [15, 7, 3]).join(',');
+        try {
+          const msg = await HttpUtil.post('/panel/api/certnotify/status', {});
+          if (msg.success && msg.obj) {
+            const cfg = msg.obj.config || {};
+            // 后端可能返回 null（老数据），统一归一化，避免模板里 .includes 抛错把整页卡死
+            this.certNotify = {
+              config: {
+                enable: !!cfg.enable,
+                channels: Array.isArray(cfg.channels) ? cfg.channels : [],
+                days: Array.isArray(cfg.days) ? cfg.days : [15, 7, 3],
+                ntfyServer: cfg.ntfyServer || 'https://ntfy.sh',
+                ntfyTopic: cfg.ntfyTopic || '',
+                webhookUrl: cfg.webhookUrl || ''
+              },
+              domain: msg.obj.domain || '',
+              notAfter: msg.obj.notAfter || '',
+              daysLeft: msg.obj.daysLeft || 0,
+              port80Busy: !!msg.obj.port80Busy
+            };
+            this.certNotifyDaysText = this.certNotify.config.days.join(',') || '15,7,3';
+          }
+        } catch (e) {
+          // 接口异常不能影响整页
+          console.error('loadCertNotify failed', e);
         }
       },
       async saveCertNotify() {
