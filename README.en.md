@@ -210,6 +210,28 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # restore (stop the panel firs
 x-ui -v                   # version
 ```
 
+## Telegram MTProto proxy (optional)
+
+Telegram encrypts its own traffic, but a plain socks5 proxy is a **cleartext pipe** that DPI can
+recognise. If you only need Telegram and want DPI resistance, install mtg (`9seconds/mtg` v2, FakeTLS):
+
+```bash
+x-ui → 30     # Telegram MTProto proxy
+  1. install / repair   # generates the secret, writes a systemd unit, opens the port
+  2. show link          # prints a tg:// link you can tap on the phone
+  3. status
+  4. uninstall
+```
+
+Notes:
+
+- **Telegram only** — cannot be used by browsers, MEGA or mail clients
+- Traffic looks like ordinary HTTPS to DPI (SNI is the domain you supply) but **no real certificate is
+  involved**, so nothing needs to be issued
+- Port 443 is usually taken by Xray, so it listens on **8443** by default; the `tg://` link carries the
+  port and secret
+- Server-side script: `scripts/mtg.sh install [domain] [port] | link | status | uninstall`
+
 ## Certificate expiry reminders
 
 acme renewals need exclusive use of port 80, which nginx or BaoTa often holds, so automatic renewal

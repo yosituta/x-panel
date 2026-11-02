@@ -46,6 +46,21 @@
 
 ---
 
+---
+
+## Telegram MTProto 代理（v1.4.19，2026-11-02）
+
+Xray 没有 MTProto 协议，面板无法创建此类节点。新增独立脚本 + 菜单项，用 `9seconds/mtg` v2 提供
+**Telegram 专用**的 FakeTLS 代理：
+
+- `scripts/mtg.sh`：`install [域名] [端口] / link / status / uninstall`
+  - 自动下载对应架构二进制、`mtg generate-secret <域名>` 生成 FakeTLS secret
+  - 写 `/etc/mtg.toml`（secret + bind-to）与 systemd 单元，开机自启
+  - 自动放行防火墙端口，卸载时撤销
+  - `link` 直接打印 `tg://proxy?...` 链接（手机点一下即可添加）
+- `x-ui → 30`：Telegram MTProto 代理（安装/链接/状态/卸载）
+- 默认端口 **8443**（443 常被 Xray 占用）；伪装域名默认取 `/root/cert/.panel_domain`
+
 ## 端口切换时自动换防火墙规则（v1.4.18，2026-11-01）
 
 以前只会"放行新端口"，旧端口一直开着，既不干净也留口子。现在改端口是成对操作：

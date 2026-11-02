@@ -2517,6 +2517,7 @@ show_menu() {
   ${green}27.${plain} 线路/IP 质量检测
   ${green}28.${plain} 地区 DNS 检测
   ${green}29.${plain} 深度调优（BBR/FQ/TFO）
+  ${green}30.${plain} Telegram MTProto 代理（FakeTLS，仅 TG 可用）
 ——————————————————————
   ${green}项目地址${plain}
   ${yellow}https://github.com/yosituta/x-panel${plain}
@@ -2525,7 +2526,7 @@ show_menu() {
 ----------------------------------------------
 "
     show_status
-    echo && read -p "请输入选项 [0-29]: " num
+    echo && read -p "请输入选项 [0-30]: " num
 
     case "${num}" in
     0)
@@ -2628,8 +2629,26 @@ show_menu() {
             *) ;;
         esac
         ;;
+    30)
+        echo -e "${green}Telegram MTProto 代理（mtg v2，FakeTLS）${plain}"
+        echo "  说明：这是 Telegram 专用代理，会把流量伪装成 HTTPS；不能给浏览器/其它软件用。"
+        echo
+        echo -e "  ${green}1.${plain} 安装 / 修复（自动生成 secret、放行端口）"
+        echo -e "  ${green}2.${plain} 查看连接链接（tg:// 一键添加）"
+        echo -e "  ${green}3.${plain} 查看状态"
+        echo -e "  ${green}4.${plain} 卸载"
+        echo -e "  ${green}0.${plain} 返回"
+        read -r -p "请选择: " mtg_choice
+        case "$mtg_choice" in
+            1) run_repo_script mtg.sh install ;;
+            2) run_repo_script mtg.sh link ;;
+            3) run_repo_script mtg.sh status ;;
+            4) run_repo_script mtg.sh uninstall ;;
+            *) ;;
+        esac
+        ;;
     *)
-        LOGE "请输入正确的数字选项 [0-29]"
+        LOGE "请输入正确的数字选项 [0-30]"
         ;;
     esac
 }

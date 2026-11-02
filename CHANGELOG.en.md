@@ -47,6 +47,22 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Telegram MTProto proxy (v1.4.19, 2026-11-02)
+
+Xray has no MTProto protocol, so the panel cannot create such an inbound. A standalone script plus a
+menu entry now provides a **Telegram-only** FakeTLS proxy via `9seconds/mtg` v2:
+
+- `scripts/mtg.sh`: `install [domain] [port] / link / status / uninstall`
+  - downloads the matching architecture, runs `mtg generate-secret <domain>` for a FakeTLS secret
+  - writes `/etc/mtg.toml` (secret + bind-to) and a systemd unit with auto-start
+  - opens the firewall port and revokes it on uninstall
+  - `link` prints a `tg://proxy?...` URL you can tap on the phone
+- `x-ui → 30`: Telegram MTProto proxy (install / link / status / uninstall)
+- default port **8443** (443 is usually taken by Xray); the disguise domain defaults to
+  `/root/cert/.panel_domain`
+
 ## Firewall rules follow port changes (v1.4.18, 2026-11-01)
 
 Previously only the new port was opened, leaving the old one exposed. Port changes are now pair-wise:

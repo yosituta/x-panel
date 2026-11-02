@@ -213,6 +213,26 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # 还原（面板需停止）
 x-ui -v                   # 版本
 ```
 
+## Telegram MTProto 代理（可选）
+
+Telegram 的聊天内容由 MTProto 自己加密，但普通 socks5 是**明文管道**，容易被 DPI 认出来。
+如果只想过 Telegram、又想要抗封锁，可以装 mtg（`9seconds/mtg` v2，FakeTLS）：
+
+```bash
+x-ui → 30     # Telegram MTProto 代理
+  1. 安装 / 修复      # 自动生成 secret、写 systemd、放行端口
+  2. 查看连接链接      # 直接给 tg:// 链接，手机点一下就能加
+  3. 状态
+  4. 卸载
+```
+
+要点：
+
+- **只对 Telegram 有效**，不能给浏览器 / MEGA / 邮件客户端用
+- 流量在 DPI 看来是正常 HTTPS（SNI 就是你填的域名），但**没有真实证书参与**，不需要签发证书
+- 443 通常被 Xray 占用，默认监听 **8443**；`tg://` 链接里已包含端口与 secret
+- 与服务端脚本对应：`scripts/mtg.sh install [域名] [端口] | link | status | uninstall`
+
 ## 证书到期提醒
 
 acme 续期要独占 80 端口，机器上常有 nginx/宝塔占着，自动续期会失败。所以除了能自动就自动，
