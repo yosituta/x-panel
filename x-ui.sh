@@ -2633,7 +2633,7 @@ show_menu() {
         echo -e "${green}Telegram MTProto 代理（mtg v2，FakeTLS）${plain}"
         echo "  说明：这是 Telegram 专用代理，会把流量伪装成 HTTPS；不能给浏览器/其它软件用。"
         echo
-        echo -e "  ${green}1.${plain} 安装 / 修复（自动生成 secret、放行端口）"
+        echo -e "  ${green}1.${plain} 安装 / 修复（会询问伪装域名与端口，自动生成 secret 并放行端口）"
         echo -e "  ${green}2.${plain} 查看连接链接（tg:// 一键添加）"
         echo -e "  ${green}3.${plain} 查看状态"
         echo -e "  ${green}4.${plain} 卸载"

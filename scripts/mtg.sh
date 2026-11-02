@@ -45,17 +45,30 @@ do_install() {
     local arch; arch=$(arch_asset)
     if [[ -z "$arch" ]]; then err "不支持的架构：$(uname -m)"; return 1; fi
 
+    # 伪装域名：一定要问，并给个合理的默认值
+    # （之前直接拿 /root/cert/.panel_domain 当默认值且不提示，等于默默用「自己的面板域名」，
+    #   而那个域名指向本机，FakeTLS 的探针回退就落到自己身上，伪装效果很差）
+    local def_domain input
+    def_domain=$(current_domain)
+    [[ -z "$def_domain" ]] && def_domain="www.microsoft.com"
     if [[ -z "$domain" ]]; then
-        domain=$(current_domain)
-    fi
-    if [[ -z "$domain" ]]; then
-        read -rp "  用于伪装的域名（FakeTLS 的 SNI，例如 hk.example.com）: " domain
+        echo "  伪装域名会写进 secret，客户端握手时用它做 SNI；建议选一个在当地能正常访问的大站。"
+        read -rp "  伪装域名 [$def_domain]: " input
+        domain="${input:-$def_domain}"
     fi
     [[ -z "$domain" ]] && { err "必须提供域名（FakeTLS 需要一个真实域名做 SNI）"; return 1; }
 
+    local panel_domain; panel_domain=$(current_domain)
+    if [[ -n "$panel_domain" && "$domain" == "$panel_domain" ]]; then
+        warn "  注意：$domain 是你自己的面板域名，它指向本机，伪装效果会差很多。"
+        warn "        建议改成 www.microsoft.com / www.cloudflare.com 这类大站。"
+        local yn; read -rp "  仍然使用它吗？[y/N]: " yn
+        [[ "$yn" =~ ^[Yy] ]] || { echo "  已取消，请重新选择 1 并填写其它域名"; return 1; }
+    fi
+
     if [[ -z "$port" ]]; then
-        read -rp "  监听端口 [${DEFAULT_PORT}]: " port
-        port="${port:-$DEFAULT_PORT}"
+        read -rp "  监听端口 [${DEFAULT_PORT}]（443 常被 Xray 占用）: " input
+        port="${input:-$DEFAULT_PORT}"
     fi
 
     log "---- 1/5 下载 mtg（$arch）----"

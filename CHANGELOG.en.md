@@ -53,6 +53,26 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## MTProto install now asks for the cloak domain (v1.4.22, 2026-11-02)
+
+- **Problem**: v1.4.19 used `/root/cert/.panel_domain` (the panel's own domain) as the default cloak
+  domain without asking, so pressing 1 silently disguised traffic as the user's own hostname. That
+  domain resolves back to the same server, which weakens probe resistance considerably.
+- **Fix**:
+  - install always asks for the cloak domain, defaulting to `www.microsoft.com` (Enter accepts it)
+  - if the value equals the panel domain, it warns and requires confirmation; answering `n` cancels
+    without touching the existing configuration
+  - the port is asked too, default 8443 (443 is usually taken by Xray)
+  - menu item 1 now reads "asks for cloak domain and port"
+- Verified on a live server:
+
+```
+press Enter                       → cloak domain www.microsoft.com, installed with a new secret
+own panel domain + answer n       → warned and cancelled, md5 of /etc/mtg.toml unchanged
+```
+
 ## Docs: MTProto proxy guide (v1.4.21, 2026-11-02)
 
 - Added `docs/MTG.md`: when to use it (and when not to), how to pick the cloak domain, how to verify the

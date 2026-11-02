@@ -34,8 +34,11 @@ bash /usr/local/x-ui/scripts/mtg.sh uninstall
 ```
 
 - 端口默认 **8443**（443 通常被 Xray 的 Reality 节点占用）
-- 伪装域名建议选一个能正常访问的大站（`www.microsoft.com`、`www.cloudflare.com`），
-  mtg 会在握手时实时连它取真实证书
+- **安装时一定会问伪装域名**（回车才用默认 `www.microsoft.com`）：
+  - 要选当地能正常访问的大站（`www.microsoft.com`、`www.cloudflare.com`）
+  - **不要填自己的面板域名**：它指向本机，FakeTLS 的探针回退会落回自己，伪装效果差很多。
+    脚本检测到这种情况会警告并要求确认，答 `n` 则取消且不改动现有配置。
+  - 换域名/端口 = 重新执行 `30 → 1`，secret 会重新生成，客户端需要重新添加
 - 客户端：Telegram → 设置 → 高级 → 连接类型 → 代理 → **MTProto**，
   填 `服务器IP:端口` + `secret`，或直接点 `tg://` 链接 / 扫二维码
 
