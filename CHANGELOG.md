@@ -50,6 +50,15 @@
 
 ---
 
+---
+
+## 文档：MTProto 代理说明（v1.4.21，2026-11-02）
+
+- 新增 `docs/MTG.md`：什么时候该用它（以及什么时候不该）、伪装域名怎么选、如何验证 FakeTLS
+  握手、常见报错（`permission denied`、安全组未放行、域名不可达）的对应处理。
+- README 中英的 MTProto 小节补充指向该文档。
+- 真机确认（Ubuntu 24.04 / amd64，端口 8443）：手机 Telegram 通过 `tg://` 链接添加后可正常收发消息。
+
 ## mtg 单元修正（v1.4.20，2026-11-02）
 
 - **修掉 `permission denied`**：mtg 的 systemd 单元原来写了 `DynamicUser=true`，

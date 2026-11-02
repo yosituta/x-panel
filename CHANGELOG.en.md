@@ -51,6 +51,17 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Docs: MTProto proxy guide (v1.4.21, 2026-11-02)
+
+- Added `docs/MTG.md`: when to use it (and when not to), how to pick the cloak domain, how to verify the
+  FakeTLS handshake, and what to do about the common failures (`permission denied`, security group not
+  open, unreachable cloak domain).
+- The MTProto sections in both READMEs now link to it.
+- Confirmed on a live Ubuntu 24.04 amd64 box (port 8443): Telegram on a phone added the proxy via the
+  `tg://` link and exchanged messages successfully.
+
 ## mtg unit fix (v1.4.20, 2026-11-02)
 
 - **Fixed `permission denied`**: the mtg systemd unit used `DynamicUser=true`, but `/etc/mtg.toml`

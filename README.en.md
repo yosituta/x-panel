@@ -231,6 +231,8 @@ Notes:
 - Port 443 is usually taken by Xray, so it listens on **8443** by default; the `tg://` link carries the
   port and secret
 - Server-side script: `scripts/mtg.sh install [domain] [port] | link | status | uninstall`
+- Full guide (choosing a cloak domain, verifying the handshake, troubleshooting):
+  [docs/MTG.md](docs/MTG.md)
 
 ## Certificate expiry reminders
 

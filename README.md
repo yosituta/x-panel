@@ -232,6 +232,7 @@ x-ui → 30     # Telegram MTProto 代理
 - 流量在 DPI 看来是正常 HTTPS（SNI 就是你填的域名），但**没有真实证书参与**，不需要签发证书
 - 443 通常被 Xray 占用，默认监听 **8443**；`tg://` 链接里已包含端口与 secret
 - 与服务端脚本对应：`scripts/mtg.sh install [域名] [端口] | link | status | uninstall`
+- 完整说明（伪装域名怎么选、验证握手、排错）：[docs/MTG.md](docs/MTG.md)
 
 ## 证书到期提醒
 
