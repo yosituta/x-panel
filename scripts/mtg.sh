@@ -192,6 +192,18 @@ do_link() {
     local tg tme
     tg=$(echo "$out" | grep -o '"tg_url": *"[^"]*"' | head -1 | sed -E 's/.*"(tg:[^"]*)"/\1/')
     tme=$(echo "$out" | grep -o '"tme_url": *"[^"]*"' | head -1 | sed -E 's/.*"(https:[^"]*)"/\1/')
+
+    # 连接地址可以换成域名（只影响显示与客户端解析，不改变实际连到的机器）
+    local linkhost ip
+    linkhost=$(awk -F': ' '/^# link-host:/ {print $2; exit}' "$CONF" 2>/dev/null | tr -d '[:space:]')
+    if [[ -n "$linkhost" ]]; then
+        ip=$(echo "$tg" | sed -n 's/.*server=\([^&]*\).*/\1/p')
+        [[ -n "$ip" ]] && tg="${tg//server=$ip/server=$linkhost}" && tme="${tme//server=$ip/server=$linkhost}"
+        echo -e "  连接地址：${green}${linkhost}${plain}（域名，解析到本机）"
+    else
+        echo -e "  连接地址：$(echo "$tg" | sed -n 's/.*server=\([^&]*\).*/\1/p')（IP）"
+        echo -e "  想用域名显示：mtg.sh sethost 你的域名"
+    fi
     echo
     log "手机 Telegram 点这个链接即可添加代理："
     [[ -n "$tg"  ]] && echo -e "  ${green}${tg}${plain}"
@@ -227,12 +239,28 @@ do_uninstall() {
     log "已卸载"
 }
 
+do_sethost() {
+    local host="${1:-}"
+    if [[ ! -f "$CONF" ]]; then err "尚未安装，先执行：mtg.sh install"; return 1; fi
+    if [[ -z "$host" ]]; then
+        host=$(current_domain)
+        [[ -z "$host" ]] && { err "请给出域名：mtg.sh sethost hk.example.com"; return 1; }
+    fi
+    # 去掉旧的记录再写新的
+    sed -i '/^# link-host:/d' "$CONF"
+    sed -i "1i # link-host: $host" "$CONF"
+    log "连接地址已设为：$host（tg:// 链接里会用域名代替 IP）"
+    echo "  注意：该域名必须解析到本机，否则客户端连不上。"
+    echo "  还原成 IP：sed -i '/^# link-host:/d' $CONF"
+}
+
 case "${1:-}" in
     install)   shift; do_install "${1:-}" "${2:-}" ;;
+    sethost)   shift; do_sethost "${1:-}" ;;
     status)    do_status ;;
     link)      do_link ;;
     uninstall) do_uninstall ;;
     *)
-        echo "用法：mtg.sh {install [域名] [端口] | status | link | uninstall}"
+        echo "用法：mtg.sh {install [伪装域名] [端口] | link | status | sethost [域名] | uninstall}"
         ;;
 esac
