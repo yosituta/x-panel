@@ -226,8 +226,10 @@ x-ui → 30     # Telegram MTProto proxy
 Notes:
 
 - **Telegram only** — cannot be used by browsers, MEGA or mail clients
-- Traffic looks like ordinary HTTPS to DPI (SNI is the domain you supply) but **no real certificate is
-  involved**, so nothing needs to be issued
+- Traffic looks like ordinary HTTPS to DPI but **no real certificate is involved**, so nothing needs
+  to be issued
+- the cloak domain is **picked at random** from a pool of China-reachable sites (1688, Taobao, JD,
+  Microsoft, Cloudflare, …) — no manual input; override with `mtg.sh install <domain> <port>`
 - Port 443 is usually taken by Xray, so it listens on **8443** by default; the `tg://` link carries the
   port and secret
 - Server-side script: `scripts/mtg.sh install [domain] [port] | link | status | uninstall`

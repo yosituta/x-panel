@@ -229,7 +229,9 @@ x-ui → 30     # Telegram MTProto 代理
 要点：
 
 - **只对 Telegram 有效**，不能给浏览器 / MEGA / 邮件客户端用
-- 流量在 DPI 看来是正常 HTTPS（SNI 就是你填的域名），但**没有真实证书参与**，不需要签发证书
+- 流量在 DPI 看来是正常 HTTPS，但**没有真实证书参与**，不需要签发证书
+- 伪装域名**自动随机**（1688 / 淘宝 / 京东 / 微软 / 云耀 等中国可访问大站），不用手输；
+  想指定就 `mtg.sh install <域名> <端口>`
 - 443 通常被 Xray 占用，默认监听 **8443**；`tg://` 链接里已包含端口与 secret
 - 与服务端脚本对应：`scripts/mtg.sh install [域名] [端口] | link | status | uninstall`
 - 完整说明（伪装域名怎么选、验证握手、排错）：[docs/MTG.md](docs/MTG.md)

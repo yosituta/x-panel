@@ -54,6 +54,26 @@
 
 ---
 
+---
+
+## MTProto 伪装域名改为自动随机（v1.4.23，2026-11-02）
+
+- **不用再手输**：伪装域名从内置池（1688 / 淘宝 / 京东 / 微软 / Cloudflare / Bing / Apple /
+  QQ / Dell / Intel）里**随机挑选**，挑之前先 `curl` 验证该域名从本机能正常 TLS 访问，不通就换下一个。
+- **修复时沿用上次的域名**：记录在 `/etc/mtg.toml` 的 `# cloak-domain:` 注释里，
+  避免每次重装都换 secret 导致手机端全部失效。
+- **仍可手动指定**：`mtg.sh install www.example.com 8443`。
+- **拒绝自己的面板域名**：它指向本机，探针会打回自己，脚本直接报错让换一个（不再只是警告）。
+- 实测（真实服务器，连续装 3 次）：
+
+```
+第 1 次: www.taobao.com
+第 2 次: www.jd.com
+第 3 次: www.bing.com
+再跑一次 → 沿用上次的伪装域名：www.bing.com
+外网 openssl 握手 → subject=CN=r.bing.com，Verify return code: 0 (ok)
+```
+
 ## MTProto 安装改为必须确认伪装域名（v1.4.22，2026-11-02）
 
 - **问题**：v1.4.19 的安装直接把 `/root/cert/.panel_domain`（面板自己的域名）当作默认伪装域名，

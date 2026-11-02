@@ -55,6 +55,28 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## MTProto cloak domain is now automatic (v1.4.23, 2026-11-02)
+
+- **No manual input**: the cloak domain is **picked at random** from a built-in pool (1688, Taobao, JD,
+  Microsoft, Cloudflare, Bing, Apple, QQ, Dell, Intel); each candidate is checked with `curl` for a
+  working TLS connection from the server first, otherwise the next one is tried.
+- **Repairs reuse the previous domain**, recorded as `# cloak-domain:` in `/etc/mtg.toml`, so a re-run
+  does not silently change the secret and break every client.
+- **Still overridable**: `mtg.sh install www.example.com 8443`.
+- **Your own panel domain is refused** (it resolves back to this host, which defeats probe resistance)
+  — the script now errors out instead of only warning.
+- Verified on a live server across three consecutive installs:
+
+```
+run 1: www.taobao.com
+run 2: www.jd.com
+run 3: www.bing.com
+re-run → reuses www.bing.com
+external openssl handshake → subject=CN=r.bing.com, Verify return code: 0 (ok)
+```
+
 ## MTProto install now asks for the cloak domain (v1.4.22, 2026-11-02)
 
 - **Problem**: v1.4.19 used `/root/cert/.panel_domain` (the panel's own domain) as the default cloak

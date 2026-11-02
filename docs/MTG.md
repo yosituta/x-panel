@@ -34,11 +34,19 @@ bash /usr/local/x-ui/scripts/mtg.sh uninstall
 ```
 
 - 端口默认 **8443**（443 通常被 Xray 的 Reality 节点占用）
-- **安装时一定会问伪装域名**（回车才用默认 `www.microsoft.com`）：
-  - 要选当地能正常访问的大站（`www.microsoft.com`、`www.cloudflare.com`）
-  - **不要填自己的面板域名**：它指向本机，FakeTLS 的探针回退会落回自己，伪装效果差很多。
-    脚本检测到这种情况会警告并要求确认，答 `n` 则取消且不改动现有配置。
-  - 换域名/端口 = 重新执行 `30 → 1`，secret 会重新生成，客户端需要重新添加
+- **伪装域名全自动，不用手输**：脚本从内置池里随机挑一个中国境内可访问的大站，
+  并先 `curl` 验证能正常 TLS 访问；不通就换下一个：
+
+  ```
+  www.1688.com  www.taobao.com  www.jd.com     www.microsoft.com  www.cloudflare.com
+  www.bing.com  www.apple.com   www.qq.com     www.dell.com       www.intel.com
+  ```
+
+  只是借用它们的域名做 SNI / 探针回退，数据不经过这些站点。
+- **修复时沿用上次的域名**（记录在 `/etc/mtg.toml` 的 `# cloak-domain:` 注释里），
+  避免每次重装都换 secret 导致客户端全部失效。
+- **想指定**：`bash /usr/local/x-ui/scripts/mtg.sh install www.example.com 8443`
+- **不能用自己的面板域名**：它指向本机，探针会打回自己，脚本会直接拒绝并提示换一个。
 - 客户端：Telegram → 设置 → 高级 → 连接类型 → 代理 → **MTProto**，
   填 `服务器IP:端口` + `secret`，或直接点 `tg://` 链接 / 扫二维码
 
