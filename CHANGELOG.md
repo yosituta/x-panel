@@ -48,6 +48,26 @@
 
 ---
 
+---
+
+## mtg 单元修正（v1.4.20，2026-11-02）
+
+- **修掉 `permission denied`**：mtg 的 systemd 单元原来写了 `DynamicUser=true`，
+  而 `/etc/mtg.toml` 里含 secret、权限是 `600 root`，动态用户读不到配置，服务起来就退出
+  （日志：`cannot init config: cannot read config file: open /etc/mtg.toml: permission denied`）。
+  改为 `User=root` + `NoNewPrivileges=true`，配置仍保持 600。
+- 真机验证（Ubuntu 24.04 / amd64，域名 www.microsoft.com，端口 8443）：
+
+```
+mtg 已启动            → systemctl is-active = active
+LISTEN 0 4096 *:8443  → 端口正常监听
+tg://proxy?port=8443&secret=7hLn...&server=182.255.80.150
+外网 openssl 握手：
+  subject = CN=www.microsoft.com
+  issuer  = Microsoft TLS G2 RSA CA OCSP 04
+  Verify return code: 0 (ok)      ← DPI 看到的就是一次正常 HTTPS
+```
+
 ## Telegram MTProto 代理（v1.4.19，2026-11-02）
 
 Xray 没有 MTProto 协议，面板无法创建此类节点。新增独立脚本 + 菜单项，用 `9seconds/mtg` v2 提供

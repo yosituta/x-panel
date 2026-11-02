@@ -106,7 +106,9 @@ Type=simple
 ExecStart=/usr/local/bin/mtg run /etc/mtg.toml
 Restart=always
 RestartSec=3
-DynamicUser=true
+# 不能用 DynamicUser：配置里含 secret，权限是 600 root，动态用户读不到（会报 permission denied）
+User=root
+NoNewPrivileges=true
 LimitNOFILE=65536
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 

@@ -49,6 +49,26 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## mtg unit fix (v1.4.20, 2026-11-02)
+
+- **Fixed `permission denied`**: the mtg systemd unit used `DynamicUser=true`, but `/etc/mtg.toml`
+  holds the secret with `600 root`, so the dynamic user could not read it and the service exited
+  (`cannot init config: cannot read config file: open /etc/mtg.toml: permission denied`).
+  Now `User=root` + `NoNewPrivileges=true`, config stays 600.
+- Verified on a live Ubuntu 24.04 amd64 box (domain www.microsoft.com, port 8443):
+
+```
+mtg started            → systemctl is-active = active
+LISTEN 0 4096 *:8443   → port bound
+tg://proxy?port=8443&secret=7hLn...&server=182.255.80.150
+external openssl handshake:
+  subject = CN=www.microsoft.com
+  issuer  = Microsoft TLS G2 RSA CA OCSP 04
+  Verify return code: 0 (ok)      ← exactly what DPI sees: a normal HTTPS session
+```
+
 ## Telegram MTProto proxy (v1.4.19, 2026-11-02)
 
 Xray has no MTProto protocol, so the panel cannot create such an inbound. A standalone script plus a
