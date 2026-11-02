@@ -412,6 +412,12 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 		}
 	}
 
+	// 【开源增强】删除入站时，若没有其它入站占用该端口，把防火墙放行也撤掉
+	delPort := inbound.Port
+	if delPort > 0 && !s.portUsedByOtherInbounds(delPort, id) {
+		RemoveFirewallPort(delPort)
+	}
+
 	return needRestart, db.Delete(model.Inbound{}, id).Error
 }
 
@@ -441,6 +447,13 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 	oldInbound, err := s.GetInbound(inbound.Id)
 	if err != nil {
 		return inbound, false, err
+	}
+
+	// 【开源增强】改了端口：新端口已放行，旧端口若没有别的入站在用就关掉
+	if oldInbound.Port > 0 && oldInbound.Port != inbound.Port {
+		if !s.portUsedByOtherInbounds(oldInbound.Port, inbound.Id) {
+			RemoveFirewallPort(oldInbound.Port)
+		}
 	}
 
 	tag := oldInbound.Tag
@@ -2401,4 +2414,16 @@ func (s *InboundService) FilterAndSortClientEmails(emails []string) ([]string, [
 	}
 
 	return validEmails, extraEmails, nil
+}
+
+// portUsedByOtherInbounds 除指定入站外，是否还有其它入站占用该端口
+func (s *InboundService) portUsedByOtherInbounds(port int, excludeId int) bool {
+	db := database.GetDB()
+	var count int64
+	if err := db.Model(&model.Inbound{}).
+		Where("port = ? AND id <> ?", port, excludeId).
+		Count(&count).Error; err != nil {
+		return true // 查不到就保守处理，不删规则
+	}
+	return count > 0
 }

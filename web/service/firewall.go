@@ -68,6 +68,27 @@ func EnsureFirewallPort(port int) {
 	logger.Infof("防火墙已放行端口 %d/tcp", port)
 }
 
+// RemoveFirewallPort 关闭某个 TCP 端口的放行（改端口/删节点时用，避免旧端口一直开着）
+func RemoveFirewallPort(port int) {
+	if port <= 0 || port > 65535 {
+		return
+	}
+	fwMu.Lock()
+	defer fwMu.Unlock()
+	switch fwBackend() {
+	case "ufw":
+		// ufw 对不存在的规则返回非 0，属正常，忽略
+		_ = exec.Command("ufw", "delete", "allow", strconv.Itoa(port)+"/tcp").Run()
+	case "firewalld":
+		_ = exec.Command("firewall-cmd", "--remove-port", strconv.Itoa(port)+"/tcp", "--permanent").Run()
+		_ = exec.Command("firewall-cmd", "--reload").Run()
+	default:
+		return
+	}
+	delete(fwOpened, port)
+	logger.Infof("防火墙已关闭端口 %d/tcp", port)
+}
+
 // EnsureFirewallPorts 批量放行
 func EnsureFirewallPorts(ports ...int) {
 	for _, p := range ports {

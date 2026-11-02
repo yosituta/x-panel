@@ -67,11 +67,16 @@ func (a *SettingController) updateSetting(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 		return
 	}
+	// 记录旧端口，改端口后要把旧端口的放行撤掉
+	oldPort, _ := a.settingService.GetPort()
 	err = a.settingService.UpdateAllSetting(allSetting)
 	if err == nil && allSetting.WebPort > 0 {
-		// 【开源增强】改端口后自动放行防火墙，否则新端口外部连不上
-		// （以前只放行过旧端口，用户改成 1999 后访问直接超时）
+		// 【开源增强】改端口后自动放行新端口，否则外部连不上
 		service.EnsureFirewallPort(allSetting.WebPort)
+		// 同时关闭旧面板端口（不然旧端口一直对外开放，既不干净也不安全）
+		if oldPort > 0 && oldPort != allSetting.WebPort {
+			service.RemoveFirewallPort(oldPort)
+		}
 	}
 	jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
 }
