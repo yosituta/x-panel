@@ -45,6 +45,29 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Firewall rules follow port changes (v1.4.18, 2026-11-01)
+
+Previously only the new port was opened, leaving the old one exposed. Port changes are now pair-wise:
+
+- **Panel port** (Settings → General → listen port): saving opens the new port with `ufw allow` and
+  removes the allow rule for the **old panel port**.
+- **Inbound/node port** (editing an inbound): the new port is opened, and the old one is closed **only
+  when no other inbound uses it**, so shared-port rules are never dropped by accident.
+- **Deleting an inbound** likewise releases its port once nothing else uses it.
+- Works with both ufw and firewalld; adds a real-firewall test that only runs with `XUI_FW_TEST=1`
+  (skipped in CI).
+
+Verified on a live server with ufw active:
+
+```
+$ XUI_FW_TEST=1 go test ./web/service -run TestFirewallAddRemove -v
+--- PASS: TestFirewallAddRemove (0.96s)
+open 18999  → appears in ufw
+close 18999 → gone from ufw
+```
+
 ## HSTS only for trusted certificates + firewall on port change (v1.4.17, 2026-11-01)
 
 **Incident**: the user changed the panel port to 1999 and the base path to `/vpn/`; after restarting,
