@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sort"
@@ -211,38 +212,48 @@ func (s *CertNotifyService) SendTest() (string, error) {
 	if info != nil && info.Domain != "" {
 		text = fmt.Sprintf("%s\n当前证书：%s（剩余 %d 天）", text, info.Domain, info.Days)
 	}
-	if !s.Send(cfg, "X-Panel 测试", text) {
-		return "", fmt.Errorf("推送失败，请检查渠道配置（日志里有详细错误）")
+	if ok, errs := s.SendDetailed(cfg, "X-Panel 测试", text); !ok {
+		if len(errs) > 0 {
+			return "", fmt.Errorf("推送失败 → %s", strings.Join(errs, "；"))
+		}
+		return "", fmt.Errorf("推送失败：没有可用的渠道")
 	}
 	return "已发送，请检查接收端", nil
 }
 
 // Send 按配置的渠道逐个发送，任一成功即算成功
 func (s *CertNotifyService) Send(cfg CertNotifyConfig, title, text string) bool {
+	ok, _ := s.SendDetailed(cfg, title, text)
+	return ok
+}
+
+// SendDetailed 同 Send，但把每个渠道的失败原因带出来（前端「发送测试」直接显示给用户）
+func (s *CertNotifyService) SendDetailed(cfg CertNotifyConfig, title, text string) (bool, []string) {
 	ok := false
+	var errs []string
 	for _, ch := range cfg.Channels {
-		switch strings.ToLower(strings.TrimSpace(ch)) {
+		name := strings.ToLower(strings.TrimSpace(ch))
+		var err error
+		switch name {
 		case "tg", "telegram":
-			if err := s.sendTG(text); err != nil {
-				logger.Warning("[证书提醒] TG 推送失败:", err)
-			} else {
-				ok = true
-			}
+			name = "Telegram"
+			err = s.sendTG(text)
 		case "ntfy":
-			if err := s.sendNtfy(cfg, title, text); err != nil {
-				logger.Warning("[证书提醒] ntfy 推送失败:", err)
-			} else {
-				ok = true
-			}
+			err = s.sendNtfy(cfg, title, text)
 		case "webhook":
-			if err := s.sendWebhook(cfg, title, text); err != nil {
-				logger.Warning("[证书提醒] Webhook 推送失败:", err)
-			} else {
-				ok = true
-			}
+			err = s.sendWebhook(cfg, title, text)
+		default:
+			continue
+		}
+		if err != nil {
+			logger.Warningf("[证书提醒] %s 推送失败: %v", name, err)
+			errs = append(errs, fmt.Sprintf("%s：%v", name, err))
+		} else {
+			ok = true
+			logger.Infof("[证书提醒] %s 推送成功", name)
 		}
 	}
-	return ok
+	return ok, errs
 }
 
 func (s *CertNotifyService) sendTG(text string) error {
@@ -252,18 +263,21 @@ func (s *CertNotifyService) sendTG(text string) error {
 	apiServer, _ := ss.GetTgBotAPIServer()
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return fmt.Errorf("Telegram 机器人 Token 未配置（面板设置 → Telegram机器人配置）")
+		return fmt.Errorf("未配置 Bot Token（面板设置 → Telegram机器人配置）")
 	}
-	if strings.TrimSpace(chatIds) == "" {
-		return fmt.Errorf("Telegram Chat ID 未配置")
+	chatIds = strings.TrimSpace(chatIds)
+	if chatIds == "" {
+		return fmt.Errorf("未配置 Chat ID（面板设置 → Telegram机器人配置），可先给机器人发个 /start 再用 @userinfobot 查 ID")
 	}
 	base := strings.TrimRight(strings.TrimSpace(apiServer), "/")
 	if base == "" {
 		base = "https://api.telegram.org"
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
-	var lastErr error
-	sentAny := false
+	if !strings.HasPrefix(base, "http") {
+		base = "https://" + base
+	}
+	client := &http.Client{Timeout: 12 * time.Second}
+	var errs []string
 	for _, id := range strings.Split(chatIds, ",") {
 		id = strings.TrimSpace(id)
 		if id == "" {
@@ -272,23 +286,47 @@ func (s *CertNotifyService) sendTG(text string) error {
 		body, _ := json.Marshal(map[string]any{"chat_id": id, "text": text})
 		resp, err := client.Post(base+"/bot"+token+"/sendMessage", "application/json", bytes.NewReader(body))
 		if err != nil {
-			lastErr = err
+			errs = append(errs, fmt.Sprintf("连不上 %s（服务器无法访问 Telegram，或被墙/代理配置错误）: %v", base, err))
 			continue
 		}
+		rb, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		resp.Body.Close()
 		if resp.StatusCode >= 300 {
-			lastErr = fmt.Errorf("telegram 返回 %d (chat_id=%s)", resp.StatusCode, id)
+			errs = append(errs, fmt.Sprintf("chat_id=%s %s", id, telegramErr(resp.StatusCode, rb)))
 			continue
 		}
-		sentAny = true
-	}
-	if sentAny {
 		return nil
 	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("没有可用的 chat_id")
+	if len(errs) == 0 {
+		return fmt.Errorf("没有可用的 chat_id")
 	}
-	return lastErr
+	return fmt.Errorf("%s", strings.Join(errs, "；"))
+}
+
+// telegramErr 把 Telegram API 的错误翻译成可操作的提示
+func telegramErr(status int, body []byte) string {
+	var payload struct {
+		Description string `json:"description"`
+	}
+	_ = json.Unmarshal(body, &payload)
+	desc := payload.Description
+	low := strings.ToLower(desc)
+	switch {
+	case status == 401 || strings.Contains(low, "unauthorized"):
+		return "Bot Token 不对（401 Unauthorized）"
+	case strings.Contains(low, "chat not found"):
+		return "Chat ID 不存在（chat not found）：确认 ID 正确，且已经给机器人发过 /start"
+	case strings.Contains(low, "bot was blocked"):
+		return "机器人被你拉黑了（bot was blocked）：先在 Telegram 里解除屏蔽"
+	case strings.Contains(low, "chat_id is empty"):
+		return "Chat ID 为空"
+	case status == 429:
+		return "Telegram 限流（429），稍后再试"
+	case desc != "":
+		return fmt.Sprintf("Telegram 返回 %d：%s", status, desc)
+	default:
+		return fmt.Sprintf("Telegram 返回 %d", status)
+	}
 }
 
 func (s *CertNotifyService) sendNtfy(cfg CertNotifyConfig, title, text string) error {
