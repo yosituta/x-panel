@@ -48,7 +48,7 @@ func (a *PanelController) list(c *gin.Context) {
 
 func (a *PanelController) add(c *gin.Context) {
 	var p service.RemotePanel
-	if err := c.ShouldBindJSON(&p); err != nil {
+	if err := bindBody(c, &p); err != nil {
 		jsonMsg(c, "参数错误", err)
 		return
 	}
@@ -65,7 +65,7 @@ func (a *PanelController) del(c *gin.Context) {
 		var body struct {
 			Name string `json:"name"`
 		}
-		_ = c.ShouldBindJSON(&body)
+		_ = bindBody(c, &body)
 		name = body.Name
 	}
 	if err := a.panelService.Remove(name); err != nil {

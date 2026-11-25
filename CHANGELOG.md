@@ -56,6 +56,34 @@
 
 ---
 
+---
+
+## 修「参数错误 (invalid character 'e' looking for beginning of value)」（v1.4.27，2026-11-25）
+
+打开【定时报告】点启用/保存时，页面弹：
+
+```
+参数错误 (invalid character 'e' looking for beginning of value)
+```
+
+**根因**：`web/assets/js/axios-init.js` 里有个全局请求拦截器，把所有非 FormData 的请求体
+用 `Qs.stringify` 转成了 `application/x-www-form-urlencoded`。而定时报告的后端用的是
+`c.ShouldBindJSON`，拿到的是 `enable=true&interval=weekly&...` 这种字符串，
+JSON 解析器读第一个字符 `e` 就报错。
+
+**修复**：新增 `web/controller/bind.go` 的 `bindBody()`，同时接受 JSON 与表单；
+`server.go`、`panels.go`、`inbound.go` 里 6 处 `ShouldBindJSON` 全部换掉（同样受影响的
+多面板、入站批量/批量部署接口一并修好）。
+
+**验证**（单元测试，`go test ./web/controller/ -run TestBindBody`）：
+
+```
+表单体 enable=true&interval=weekly&time=09%3A00&weekday=3&content=server&content=traffic
+  → Enable=true Interval=weekly Time=09:00 Weekday=3 Content=[server traffic]   PASS
+JSON 体 → 正常解析                                                              PASS
+空体   → 不报错                                                                PASS
+```
+
 ## MTProto 伪装域名改为自动随机（v1.4.23，2026-11-02）
 
 - **不用再手输**：伪装域名从内置池（1688 / 淘宝 / 京东 / 微软 / Cloudflare / Bing / Apple /

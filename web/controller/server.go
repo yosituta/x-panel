@@ -335,7 +335,7 @@ func (a *ServerController) saveHistory(c *gin.Context) {
 		Type string `json:"type"`
 		Link string `json:"link"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := bindBody(c, &req); err != nil {
 		jsonMsg(c, "Invalid request", err)
 		return
 	}
@@ -521,7 +521,7 @@ func (a *ServerController) reportConfig(c *gin.Context) {
 		Day      int      `json:"day"`
 		Content  []string `json:"content"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := bindBody(c, &body); err != nil {
 		jsonMsg(c, "参数错误", err)
 		return
 	}

@@ -396,7 +396,7 @@ func (a *InboundController) updateClientTraffic(c *gin.Context) {
 	}
 
 	var request TrafficUpdateRequest
-	err := c.ShouldBindJSON(&request)
+	err := bindBody(c, &request)
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), err)
 		return
@@ -414,7 +414,7 @@ func (a *InboundController) updateClientTraffic(c *gin.Context) {
 // 【开源增强】一键中转节点：本机入口 → 远程 Socks5/HTTP → 出网
 func (a *InboundController) createRelay(c *gin.Context) {
 	var opts service.RelayOptions
-	if err := c.ShouldBindJSON(&opts); err != nil {
+	if err := bindBody(c, &opts); err != nil {
 		jsonMsg(c, "参数错误", err)
 		return
 	}

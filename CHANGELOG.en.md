@@ -57,6 +57,28 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## Fixed "参数错误 (invalid character 'e' looking for beginning of value)" (v1.4.27, 2026-11-25)
+
+Enabling or saving **Scheduled report** popped:
+
+```
+参数错误 (invalid character 'e' looking for beginning of value)
+```
+
+**Root cause**: a global request interceptor in `web/assets/js/axios-init.js` converts every
+non-FormData body with `Qs.stringify`, i.e. `application/x-www-form-urlencoded`. The scheduled-report
+handler used `c.ShouldBindJSON`, so it received `enable=true&interval=weekly&...` and the JSON decoder
+choked on the leading `e`.
+
+**Fix**: new `bindBody()` in `web/controller/bind.go` accepts both JSON and form bodies; all six
+`ShouldBindJSON` call sites (`server.go`, `panels.go`, `inbound.go`) now use it, which also fixes the
+multi-panel and inbound batch/deploy endpoints hit by the same mismatch.
+
+**Verified** with unit tests (`go test ./web/controller/ -run TestBindBody`): form body, JSON body and
+empty body all pass.
+
 ## MTProto cloak domain is now automatic (v1.4.23, 2026-11-02)
 
 - **No manual input**: the cloak domain is **picked at random** from a built-in pool (1688, Taobao, JD,
