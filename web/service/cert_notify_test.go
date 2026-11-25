@@ -10,7 +10,7 @@ func TestTelegramErrMapping(t *testing.T) {
 		want   string
 	}{
 		{"401", 401, `{"ok":false,"description":"Unauthorized"}`, "Bot Token 不对（401 Unauthorized）"},
-		{"chat not found", 400, `{"ok":false,"description":"Bad Request: chat not found"}`, "Chat ID 不存在（chat not found）：确认 ID 正确，且已经给机器人发过 /start"},
+		{"chat not found", 400, `{"ok":false,"description":"Bad Request: chat not found"}`, "Chat ID 不存在（chat not found）：私聊要先给机器人发 /start；群组必须是 -100 开头的负数，且机器人已被拉进群"},
 		{"blocked", 403, `{"ok":false,"description":"Forbidden: bot was blocked by the user"}`, "机器人被你拉黑了（bot was blocked）：先在 Telegram 里解除屏蔽"},
 		{"empty chat", 400, `{"ok":false,"description":"Bad Request: chat_id is empty"}`, "Chat ID 为空"},
 		{"429", 429, `{"ok":false,"description":"Too Many Requests: retry after 5"}`, "Telegram 限流（429），稍后再试"},

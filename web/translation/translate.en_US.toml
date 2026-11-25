@@ -426,7 +426,7 @@
 "telegramAPIServer" = "Telegram API Server"
 "telegramAPIServerDesc" = "The Telegram API server to use. Leave blank to use the default server."
 "telegramChatId" = "Admin Chat ID"
-"telegramChatIdDesc" = "The Telegram Admin Chat ID(s). (comma-separated)(get it here @userinfobot) or (use '/id' command in the bot)"
+"telegramChatIdDesc" = "The Telegram Admin Chat ID(s), comma-separated. Personal ID: @userinfobot. A GROUP id is negative (starts with -100) — add the bot to the group and send /id there"
 "telegramNotifyTime" = "Notification Time"
 "telegramNotifyTimeDesc" = "The Telegram bot notification time set for periodic reports. (use the crontab time format)"
 "tgNotifyBackup" = "Database Backup"

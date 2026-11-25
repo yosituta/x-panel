@@ -315,7 +315,7 @@ func telegramErr(status int, body []byte) string {
 	case status == 401 || strings.Contains(low, "unauthorized"):
 		return "Bot Token 不对（401 Unauthorized）"
 	case strings.Contains(low, "chat not found"):
-		return "Chat ID 不存在（chat not found）：确认 ID 正确，且已经给机器人发过 /start"
+		return "Chat ID 不存在（chat not found）：私聊要先给机器人发 /start；群组必须是 -100 开头的负数，且机器人已被拉进群"
 	case strings.Contains(low, "bot was blocked"):
 		return "机器人被你拉黑了（bot was blocked）：先在 Telegram 里解除屏蔽"
 	case strings.Contains(low, "chat_id is empty"):

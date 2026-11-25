@@ -529,6 +529,17 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 	case "id":
 		onlyMessage = true
 		msg += t.I18nBot("tgbot.commands.getID", "ID=="+strconv.FormatInt(message.From.ID, 10))
+		// 【开源增强】群组里 /id 之前只回个人 ID，用户拿它去填通知会 chat not found。
+		// 这里补上「当前会话」的 Chat ID：私聊时等于个人 ID，群组时是 -100 开头的负数。
+		if message.Chat.ID != 0 {
+			chatID := message.Chat.ID
+			if chatID != message.From.ID {
+				msg += fmt.Sprintf("\n\n<b>当前群组 Chat ID</b>：<code>%d</code>", chatID)
+				msg += "\n（要往这个群发通知，就填这一个，前面带负号）"
+			} else {
+				msg += fmt.Sprintf("\n\n<b>当前会话 Chat ID</b>：<code>%d</code>", chatID)
+			}
+		}
 	case "usage":
 		onlyMessage = true
 		if len(commandArgs) > 0 {

@@ -444,7 +444,7 @@
 "telegramAPIServer" = "Telegram API Server"
 "telegramAPIServerDesc" = "要使用的 Telegram API 服务器。留空以使用默认服务器。"
 "telegramChatId" = "管理员聊天 ID"
-"telegramChatIdDesc" = "Telegram 管理员聊天 ID (多个以逗号分隔)（可通过 @userinfobot 获取，或在机器人中使用 '/id' 命令获取）"
+"telegramChatIdDesc" = "Telegram 管理员聊天 ID (多个以逗号分隔)。个人 ID 用 @userinfobot 查；群组 ID 是负数（-100 开头），把机器人拉进群后在群里发 /id 获取"
 "telegramNotifyTime" = "通知时间"
 "telegramNotifyTimeDesc" = "设置周期性的 Telegram 机器人通知时间（使用 crontab 时间格式）"
 "tgNotifyBackup" = "数据库备份"
