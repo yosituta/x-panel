@@ -61,6 +61,23 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## New menu 31: open a port by typing its number (v1.4.29, 2026-11-27)
+
+```
+x-ui → 31
+  请输入端口（留空返回）: 8443
+    已放行 8443/tcp（ufw）
+```
+
+- Single `443`, multiple `443,8443`, UDP `51820/udp`, or a range `40000-40100`
+- Auto-detects ufw / firewalld and applies rules immediately
+- If ufw is not enabled it asks whether to enable it now
+- Input is whitelist-validated (`443&&rm` is rejected)
+
+**Verified** by `bash scripts/test_open_port.sh` (fake ufw, 13 assertions, all pass).
+
 ## "Subscription" button is now a real confirm dialog (v1.4.28, 2026-11-27)
 
 Clicking it only showed an informational box, because the URL was opened with `window.open`;

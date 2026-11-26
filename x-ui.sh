@@ -941,6 +941,86 @@ show_xray_status() {
     fi
 }
 
+# 【开源增强】开放端口：只要输入端口号，自动判断 ufw / firewalld 并放行
+# 支持：443        单个端口（TCP）
+#       443,8443   多个端口
+#       51820/udp  指定 UDP
+#       40000-40100 端口段
+quick_open_port() {
+    echo
+    echo -e "${yellow}开放端口${plain}：直接输入端口号回车即可。"
+    echo -e "  多个用逗号分隔：${green}443,8443${plain}"
+    echo -e "  要开 UDP 加后缀：${green}51820/udp${plain}"
+    echo -e "  端口段：${green}40000-40100${plain}"
+    echo
+    read -rp "请输入端口（留空返回）: " input
+    input=$(echo "$input" | tr -d '[:space:]')
+    [[ -z "$input" ]] && return 0
+
+    local token proto range port
+    local -a tokens
+    IFS=',' read -ra tokens <<< "$input"
+    for token in "${tokens[@]}"; do
+        if ! [[ "$token" =~ ^([0-9]{1,5})(-([0-9]{1,5}))?(/(tcp|udp))?$ ]]; then
+            echo -e "${red}格式不对：$token${plain}（示例：443、443,8443、51820/udp、40000-40100）"
+            return 1
+        fi
+        port=$(echo "$token" | sed -E 's#/.*##; s#-.*##')
+        if [[ "$port" -lt 1 || "$port" -gt 65535 ]]; then
+            echo -e "${red}端口超出范围：$port（1-65535）${plain}"
+            return 1
+        fi
+    done
+
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+        for token in "${tokens[@]}"; do
+            proto="tcp"; [[ "$token" == */udp ]] && proto="udp"
+            range=${token%/*}
+            if firewall-cmd --permanent --add-port="${range}/${proto}" >/dev/null 2>&1; then
+                echo -e "  ${green}已放行${plain} ${range}/${proto}（firewalld）"
+            else
+                echo -e "  ${red}放行失败${plain} ${range}/${proto}"
+            fi
+        done
+        firewall-cmd --reload >/dev/null 2>&1
+    else
+        if ! command -v ufw &>/dev/null; then
+            echo "  ufw 未安装，正在安装..."
+            apt-get update -qq && apt-get install -y ufw >/dev/null 2>&1
+        fi
+        for token in "${tokens[@]}"; do
+            proto="tcp"; [[ "$token" == */udp ]] && proto="udp"
+            range=${token%/*}
+            if ufw allow "${range}/${proto}" >/dev/null 2>&1; then
+                echo -e "  ${green}已放行${plain} ${range}/${proto}（ufw）"
+            else
+                echo -e "  ${red}放行失败${plain} ${range}/${proto}"
+            fi
+        done
+
+        if ! ufw status 2>/dev/null | grep -q "Status: active"; then
+            echo
+            echo -e "${yellow}注意：ufw 当前未启用，上面写的规则暂不生效。${plain}"
+            local yn
+            read -rp "  现在就启用 ufw？[Y/n]: " yn
+            if [[ ! "$yn" =~ ^[Nn] ]]; then
+                ufw --force enable >/dev/null 2>&1 && echo "  ufw 已启用"
+            else
+                echo "  已跳过（以后可用 x-ui → 21 → 4 启用）"
+            fi
+        fi
+    fi
+
+    echo
+    echo "当前放行情况："
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+        firewall-cmd --list-ports 2>/dev/null | tr ' ' '\n' | sed 's/^/  /' | head -20
+    else
+        ufw status 2>/dev/null | sed -n '4,30p' | sed 's/^/  /'
+    fi
+    echo
+}
+
 firewall_menu() {
     echo -e "${green}\t1.${plain} 安装防火墙并开放端口"
     echo -e "${green}\t2.${plain} 允许列表"
@@ -2518,6 +2598,7 @@ show_menu() {
   ${green}28.${plain} 地区 DNS 检测
   ${green}29.${plain} 深度调优（BBR/FQ/TFO）
   ${green}30.${plain} Telegram MTProto 代理（FakeTLS，仅 TG 可用）
+  ${green}31.${plain} 开放端口（输入端口号即可）
 ——————————————————————
   ${green}项目地址${plain}
   ${yellow}https://github.com/yosituta/x-panel${plain}
@@ -2526,7 +2607,7 @@ show_menu() {
 ----------------------------------------------
 "
     show_status
-    echo && read -p "请输入选项 [0-30]: " num
+    echo && read -p "请输入选项 [0-31]: " num
 
     case "${num}" in
     0)
@@ -2647,8 +2728,11 @@ show_menu() {
             *) ;;
         esac
         ;;
+    31)
+        quick_open_port
+        ;;
     *)
-        LOGE "请输入正确的数字选项 [0-30]"
+        LOGE "请输入正确的数字选项 [0-31]"
         ;;
     esac
 }

@@ -210,6 +210,17 @@ x-ui backup -restore x-ui-20260101-090000.db.gz   # restore (stop the panel firs
 x-ui -v                   # version
 ```
 
+## Open a port (menu 31)
+
+```bash
+x-ui → 31        # type the port number and press Enter
+```
+
+- Accepts a single port `443`, several `443,8443`, UDP `51820/udp`, or a range `40000-40100`
+- Detects ufw / firewalld (CentOS family) and applies the rule immediately
+- Offers to enable the firewall if it is not running yet
+- Changing the panel port or creating an inbound already handles the firewall in pairs
+
 ## Telegram MTProto proxy (optional)
 
 Telegram encrypts its own traffic, but a plain socks5 proxy is a **cleartext pipe** that DPI can
