@@ -59,6 +59,16 @@ after restart the panel serves: issuer=C=US, O=Let's Encrypt, CN=YE1 (expires 20
 
 ---
 
+---
+
+## "Subscription" button is now a real confirm dialog (v1.4.28, 2026-11-27)
+
+Clicking it only showed an informational box, because the URL was opened with `window.open`;
+when a browser blocks the popup the user just sees text and nothing happens.
+
+It is now a confirm dialog with an **"Open subscription panel"** button; if the popup is blocked the
+address is shown so it can be copied.
+
 ## Fixed "参数错误 (invalid character 'e' looking for beginning of value)" (v1.4.27, 2026-11-25)
 
 Enabling or saving **Scheduled report** popped:
